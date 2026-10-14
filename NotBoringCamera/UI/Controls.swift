@@ -16,8 +16,10 @@ struct Dial: View {
     let ink: Color
     var size: CGFloat = 104
     var onTap: (() -> Void)? = nil
+    var onLongPress: (() -> Void)? = nil
     @EnvironmentObject var tiltHolder: TiltBox
     @State private var startIndex: Int?
+    @State private var longPressed = false
 
     var body: some View {
         ZStack {
@@ -48,9 +50,13 @@ struct Dial: View {
                 if new != index { index = new; Feedback.tick() }
             }
             .onEnded { v in
-                if abs(v.translation.width) < 6 && abs(v.translation.height) < 6 { onTap?() }
-                startIndex = nil
+                if !longPressed && abs(v.translation.width) < 6 && abs(v.translation.height) < 6 { onTap?() }
+                startIndex = nil; longPressed = false
             })
+        .simultaneousGesture(LongPressGesture(minimumDuration: 0.6).onEnded { _ in
+            guard let onLongPress else { return }
+            longPressed = true; onLongPress()
+        })
         .accessibilityLabel(label)
         .accessibilityAdjustableAction { d in
             index = min(max(index + (d == .increment ? 1 : -1), 0), count - 1)

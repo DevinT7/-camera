@@ -48,6 +48,9 @@ final class CameraModel: NSObject, ObservableObject {
     @Published var shutterIndex = 0 { didSet { applyManualExposure() } }
     @Published var wbIndex = 33 { didSet { applyWB() } }          // 2600...9000 step 100
     @Published var focusPos: Float = 0.5 { didSet { applyFocus() } }
+    /// Settings the user has moved off their defaults (drives the reset affordance).
+    @Published var touched: Set<ManualParam> = []
+    private var seeding = false
 
     var evLadder: [Float] { (0...36).map { Float($0 - 18) / 3 } }
     private(set) var isoLadder: [Float] = [54, 100, 200, 400, 800, 1600, 3200, 6400, 12000]
@@ -260,6 +263,29 @@ final class CameraModel: NSObject, ObservableObject {
     func beginManualFocus(at p: CGPoint) { manualFocusActive = true; focusPoint = p }
     func endManualFocus() { DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { self.manualFocusActive = false; self.focusPoint = nil } }
 
+    /// Puts one setting back to its default: EV 0, ISO 100, 1/60s, 5500K, or autofocus.
+    func reset(_ p: ManualParam) {
+        func nearest<T: BinaryFloatingPoint>(_ a: [T], _ v: T) -> Int { a.enumerated().min { abs($0.element - v) < abs($1.element - v) }?.offset ?? 0 }
+        switch p {
+        case .ev: evIndex = 18
+        case .iso: isoIndex = nearest(isoLadder, 100)
+        case .shutter: shutterIndex = nearest(shutterLadder, 1.0 / 60)
+        case .wb: wbIndex = nearest(wbLadder, 5500)
+        case .focus:
+            sessionQueue.async {
+                guard let d = self.device else { return }
+                try? d.lockForConfiguration()
+                if d.isFocusModeSupported(.continuousAutoFocus) { d.focusMode = .continuousAutoFocus }
+                d.unlockForConfiguration()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    self.seeding = true; self.focusPos = d.lensPosition; self.seeding = false
+                }
+            }
+        }
+        touched.remove(p)
+        Feedback.thump()
+    }
+
     /// Copies what auto exposure/WB/focus are doing right now into the manual ladders, so switching to manual doesn't jump.
     func seedManualFromAuto() {
         guard let d = device else { return }
@@ -274,7 +300,7 @@ final class CameraModel: NSObject, ObservableObject {
     }
 
     private func applyModeChange() {
-        if !isManual { param = .ev }
+        if !isManual { param = .ev; touched = touched.intersection([.ev]) }
         settings.lastManual = isManual
         sessionQueue.async {
             guard let d = self.device else { return }
@@ -303,7 +329,7 @@ final class CameraModel: NSObject, ObservableObject {
     }
 
     private func applyManualExposure() {
-        guard isManual else { return }
+        guard isManual, !seeding else { return }
         sessionQueue.async {
             guard let d = self.device else { return }
             try? d.lockForConfiguration(); self.applyManualExposureLocked(d); d.unlockForConfiguration()
@@ -318,7 +344,7 @@ final class CameraModel: NSObject, ObservableObject {
     }
 
     private func applyWB() {
-        guard isManual else { return }
+        guard isManual, !seeding else { return }
         let k = wbLadder[wbIndex]
         sessionQueue.async {
             guard let d = self.device, d.isLockingWhiteBalanceWithCustomDeviceGainsSupported else { return }
@@ -332,7 +358,7 @@ final class CameraModel: NSObject, ObservableObject {
     }
 
     private func applyFocus() {
-        guard isManual else { return }
+        guard isManual, !seeding else { return }
         let p = focusPos
         sessionQueue.async {
             guard let d = self.device, d.isLockingFocusWithCustomLensPositionSupported else { return }

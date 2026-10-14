@@ -19,7 +19,7 @@ struct CameraView: View {
     var body: some View {
         ZStack {
             cw.bodyColor.ignoresSafeArea()
-            VStack(spacing: 14) {
+            VStack(spacing: 10) {
                 topBar
                 viewfinder
                 modeToggle
@@ -65,17 +65,17 @@ struct CameraView: View {
             ForEach([CaptureMode.photo, .video], id: \.self) { m in
                 let on = model.captureMode == m
                 HStack(spacing: 6) {
-                    Image(systemName: m == .photo ? "camera.fill" : "video.fill").font(.system(size: 12, weight: .bold))
-                    Text(m == .photo ? "PHOTO" : "VIDEO").font(.system(size: 12, weight: .heavy, design: .rounded)).tracking(1)
+                    Image(systemName: m == .photo ? "camera.fill" : "video.fill").font(.system(size: 11, weight: .bold))
+                    Text(m == .photo ? "PHOTO" : "VIDEO").font(.system(size: 11, weight: .heavy, design: .rounded)).tracking(1)
                 }
-                .frame(width: 104, height: 32)
+                .frame(width: 94, height: 28)
                 .background(on ? (m == .video ? Color(hex: "FF3B30") : cw.dialColor) : .clear, in: Capsule())
                 .foregroundStyle(on ? .white : cw.ink.opacity(0.6))
                 .contentShape(Capsule())
                 .onTapGesture { model.setMode(m) }
             }
         }
-        .padding(3).background(cw.panelColor, in: Capsule())
+        .padding(2).background(cw.panelColor, in: Capsule())
         .opacity(model.isRecording ? 0.4 : 1).allowsHitTesting(!model.isRecording)
         .animation(.easeInOut(duration: 0.2), value: model.captureMode)
     }
@@ -179,7 +179,6 @@ struct CameraView: View {
                 model.setZoom((pinchBase ?? 1) * s)
             }.onEnded { _ in pinchBase = nil })
         }
-        .aspectRatio(settings.aspect == .square ? 1 : 0.78, contentMode: .fit)
     }
 
     private var simulatorPlaceholder: some View {
@@ -250,12 +249,30 @@ struct CameraView: View {
             switch model.param { case .ev: return model.evIndex; case .iso: return model.isoIndex; case .shutter: return model.shutterIndex; case .wb: return model.wbIndex; case .focus: return Int(model.focusPos * 50) }
         }, set: { v in
             // Turning a manual-only setting while in Auto hands control to Manual (values were seeded from Auto).
+            model.touched.insert(model.param)
             if model.param != .ev && !model.isManual { model.isManual = true }
             switch model.param { case .ev: model.evIndex = v; case .iso: model.isoIndex = v; case .shutter: model.shutterIndex = v; case .wb: model.wbIndex = v; case .focus: model.focusPos = Float(v) / 50 }
         })
     }
     private var activeCount: Int {
         switch model.param { case .ev: return model.evLadder.count; case .iso: return model.isoLadder.count; case .shutter: return model.shutterLadder.count; case .wb: return model.wbLadder.count; case .focus: return 51 }
+    }
+
+    /// Shows the value; once it has been moved it becomes a one-tap reset to default (long-press on the dial does the same).
+    @ViewBuilder private var valueReadout: some View {
+        if model.touched.contains(model.param) {
+            Button { model.reset(model.param) } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.counterclockwise").font(.system(size: 10, weight: .black))
+                    Text(value(for: model.param)).font(.system(size: 11, weight: .heavy, design: .rounded)).monospacedDigit()
+                }
+                .padding(.horizontal, 9).padding(.vertical, 4)
+                .background(cw.dialColor, in: Capsule()).foregroundStyle(.white)
+            }.buttonStyle(.plain).transition(.scale.combined(with: .opacity))
+        } else {
+            Text(value(for: model.param)).font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(cw.ink).monospacedDigit()
+                .padding(.vertical, 4)
+        }
     }
 
     /// Tap the dial to cycle what it controls: EXP → SS → ISO → WB → FOCUS → EXP (works in Auto and Manual).
@@ -270,8 +287,8 @@ struct CameraView: View {
     private var controls: some View {
         HStack(alignment: .center) {
             VStack(spacing: 6) {
-                Dial(label: model.param == .ev ? "EXP" : model.param.rawValue, count: activeCount, index: activeIndex, color: cw.dialColor, ink: .white, onTap: cycleParam)
-                Text(value(for: model.param)).font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(cw.ink).monospacedDigit()
+                Dial(label: model.param == .ev ? "EXP" : model.param.rawValue, count: activeCount, index: activeIndex, color: cw.dialColor, ink: .white, onTap: cycleParam, onLongPress: { model.reset(model.param) })
+                valueReadout
             }
             Spacer()
             ShutterButton(colorway: cw, recording: model.isRecording) { model.capture() }
