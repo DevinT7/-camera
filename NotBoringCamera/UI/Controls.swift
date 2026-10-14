@@ -1,0 +1,169 @@
+import SwiftUI
+import Combine
+
+final class TiltBox: ObservableObject {
+    let tilt = Tilt()
+    private var bag: AnyCancellable?
+    init() { bag = tilt.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() } }
+}
+
+/// A notched dial. Each notch fires a haptic tick + click sound. A tap (no drag) calls `onTap`.
+struct Dial: View {
+    let label: String
+    let count: Int
+    @Binding var index: Int
+    let color: Color
+    let ink: Color
+    var size: CGFloat = 104
+    var onTap: (() -> Void)? = nil
+    @EnvironmentObject var tiltHolder: TiltBox
+    @State private var startIndex: Int?
+
+    var body: some View {
+        ZStack {
+            Circle().fill(LinearGradient(colors: [color.opacity(0.95), color.opacity(0.72)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .shadow(color: .black.opacity(0.35), radius: 8, x: tiltHolder.tilt.x * 7, y: tiltHolder.tilt.y * 7 + 2)
+            Circle().strokeBorder(.white.opacity(0.35), lineWidth: 1.5)
+            ZStack {
+                ForEach(0..<36, id: \.self) { i in
+                    Capsule().fill(ink.opacity(i % 3 == 0 ? 0.9 : 0.4))
+                        .frame(width: 2.5, height: i % 3 == 0 ? 11 : 7)
+                        .offset(y: -size / 2 + 12)
+                        .rotationEffect(.degrees(Double(i) * 10))
+                }
+                Circle().fill(ink).frame(width: 9, height: 9).offset(y: -size / 2 + 26)
+            }
+            .rotationEffect(.degrees(Double(index) * 10))
+            .animation(.spring(response: 0.18, dampingFraction: 0.8), value: index)
+            Circle().fill(.black.opacity(0.12)).frame(width: size * 0.42)
+            Text(label).font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(ink).tracking(1)
+        }
+        .frame(width: size, height: size)
+        .contentShape(Circle())
+        .gesture(DragGesture(minimumDistance: 0)
+            .onChanged { v in
+                if startIndex == nil { startIndex = index }
+                let delta = Int((v.translation.width / 14).rounded())
+                let new = min(max((startIndex ?? 0) + delta, 0), count - 1)
+                if new != index { index = new; Feedback.tick() }
+            }
+            .onEnded { v in
+                if abs(v.translation.width) < 6 && abs(v.translation.height) < 6 { onTap?() }
+                startIndex = nil
+            })
+        .accessibilityLabel(label)
+        .accessibilityAdjustableAction { d in
+            index = min(max(index + (d == .increment ? 1 : -1), 0), count - 1)
+        }
+    }
+}
+
+/// Chunky two-state switch, like a physical toggle.
+struct ChunkySwitch: View {
+    let top: String
+    let bottom: String
+    @Binding var isOn: Bool
+    let colorway: Colorway
+    @EnvironmentObject var tiltHolder: TiltBox
+
+    var body: some View {
+        VStack(spacing: 6) {
+            ZStack(alignment: isOn ? .trailing : .leading) {
+                Capsule().fill(colorway.panelColor).frame(width: 78, height: 42)
+                    .overlay(Capsule().strokeBorder(.black.opacity(0.12), lineWidth: 1.5))
+                    .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
+                Capsule().fill(isOn ? colorway.dialColor : colorway.ink.opacity(0.85))
+                    .frame(width: 40, height: 34).padding(4)
+                    .shadow(color: .black.opacity(0.35), radius: 3, x: tiltHolder.tilt.x * 4, y: tiltHolder.tilt.y * 4 + 1)
+            }
+            .animation(.spring(response: 0.22, dampingFraction: 0.7), value: isOn)
+            Text(isOn ? top : bottom).font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(colorway.ink).tracking(1)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { isOn.toggle(); Feedback.toggle() }
+    }
+}
+
+struct ShutterButton: View {
+    let colorway: Colorway
+    var recording = false
+    let action: () -> Void
+    @GestureState private var pressed = false
+    @EnvironmentObject var tiltHolder: TiltBox
+
+    var body: some View {
+        ZStack {
+            Circle().fill(colorway.panelColor).frame(width: 112, height: 112)
+                .overlay(Circle().strokeBorder(.black.opacity(0.1), lineWidth: 2))
+            Circle().fill(LinearGradient(colors: [colorway.shutterColor, colorway.shutterColor.opacity(0.8)], startPoint: .top, endPoint: .bottom))
+                .frame(width: 92, height: 92)
+                .shadow(color: .black.opacity(pressed ? 0.1 : 0.4), radius: pressed ? 2 : 9, x: tiltHolder.tilt.x * 6, y: pressed ? 1 : tiltHolder.tilt.y * 6 + 3)
+                .scaleEffect(pressed ? 0.93 : 1)
+            if recording { RoundedRectangle(cornerRadius: 5).fill(.white).frame(width: 26, height: 26) }
+        }
+        .animation(.spring(response: 0.15, dampingFraction: 0.6), value: pressed)
+        .gesture(DragGesture(minimumDistance: 0).updating($pressed) { _, s, _ in s = true }.onEnded { _ in action() })
+        .accessibilityLabel("Shutter").accessibilityAddTraits(.isButton)
+    }
+}
+
+struct GridOverlay: View {
+    let style: GridStyle
+    var body: some View {
+        GeometryReader { g in
+            Path { p in
+                let w = g.size.width, h = g.size.height
+                func vl(_ x: CGFloat) { p.move(to: .init(x: x, y: 0)); p.addLine(to: .init(x: x, y: h)) }
+                func hl(_ y: CGFloat) { p.move(to: .init(x: 0, y: y)); p.addLine(to: .init(x: w, y: y)) }
+                switch style {
+                case .off: break
+                case .thirds: [1, 2].forEach { vl(w * CGFloat($0) / 3); hl(h * CGFloat($0) / 3) }
+                case .four: (1..<4).forEach { vl(w * CGFloat($0) / 4); hl(h * CGFloat($0) / 4) }
+                case .sixByFour: (1..<4).forEach { vl(w * CGFloat($0) / 4) }; (1..<6).forEach { hl(h * CGFloat($0) / 6) }
+                case .phi: let a: CGFloat = 0.382; [a, 1 - a].forEach { vl(w * $0); hl(h * $0) }
+                case .golden: let a: CGFloat = 0.236; [a, 0.5, 1 - a].forEach { vl(w * $0) }; [a, 1 - a].forEach { hl(h * $0) }
+                }
+            }
+            .stroke(.white.opacity(0.55), lineWidth: 0.8)
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+struct HistogramView: View {
+    let bins: [Float]
+    var body: some View {
+        GeometryReader { g in
+            HStack(alignment: .bottom, spacing: 1) {
+                ForEach(bins.indices, id: \.self) { i in
+                    Rectangle().fill(.white.opacity(0.9)).frame(height: max(1, CGFloat(bins[i]) * g.size.height))
+                }
+            }
+        }
+        .padding(6)
+        .background(.black.opacity(0.45), in: RoundedRectangle(cornerRadius: 8))
+        .allowsHitTesting(false)
+    }
+}
+
+/// Yellow focus ring marked with min/max focus distance, as in the original's precision focus.
+struct FocusRing: View {
+    let manual: Bool
+    let minFocusMM: Int
+    var body: some View {
+        ZStack {
+            Circle().strokeBorder(Color(hex: "FFD60A"), lineWidth: manual ? 3 : 2).frame(width: manual ? 120 : 76, height: manual ? 120 : 76)
+            if manual {
+                VStack {
+                    Text("∞").font(.system(size: 12, weight: .heavy, design: .rounded))
+                    Spacer()
+                    Text(minFocusMM > 0 ? "\(max(minFocusMM / 10, 1))cm" : "MIN").font(.system(size: 12, weight: .heavy, design: .rounded))
+                    if minFocusMM > 0 && minFocusMM <= 120 { Text("MACRO").font(.system(size: 9, weight: .heavy, design: .rounded)) }
+                }
+                .frame(height: 150).foregroundStyle(Color(hex: "FFD60A"))
+            }
+        }
+        .allowsHitTesting(false)
+        .transition(.scale(scale: 1.4).combined(with: .opacity))
+    }
+}

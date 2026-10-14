@@ -1,0 +1,79 @@
+name: NotBoringCamera
+options:
+  bundleIdPrefix: com.devin.camera
+  deploymentTarget:
+    iOS: "18.2"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+targets:
+  NotBoringCamera:
+    type: application
+    platform: iOS
+    sources: [NotBoringCamera, Shared]
+    dependencies:
+      - target: NotBoringWidgets
+      - target: NotBoringLockedCapture
+    entitlements:
+      path: NotBoringCamera/NotBoringCamera.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.devin.camera.notboring]
+    info:
+      path: NotBoringCamera/Info.plist
+      properties:
+        CFBundleDisplayName: "!Camera"
+        UILaunchScreen: {}
+        UIRequiresFullScreen: true
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSCameraUsageDescription: "!Camera uses the camera to take photos and videos."
+        NSMicrophoneUsageDescription: "!Camera records sound with your videos."
+        NSPhotoLibraryAddUsageDescription: "!Camera saves your photos and videos to your library."
+        NSPhotoLibraryUsageDescription: "!Camera opens photos from your library in Photo Lab."
+        CFBundleURLTypes:
+          - CFBundleURLName: com.devin.camera.notboring
+            CFBundleURLSchemes: [notboringcamera]
+        NSSupportsLiveActivities: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.devin.camera.notboring
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1"
+  NotBoringWidgets:
+    type: app-extension
+    platform: iOS
+    sources: [Widgets, Shared]
+    entitlements:
+      path: Widgets/Widgets.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.devin.camera.notboring]
+    info:
+      path: Widgets/Info.plist
+      properties:
+        CFBundleDisplayName: "!Camera Widgets"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.devin.camera.notboring.widgets
+        TARGETED_DEVICE_FAMILY: "1"
+  NotBoringLockedCapture:
+    type: app-extension
+    platform: iOS
+    sources: [LockedCapture, Shared]
+    entitlements:
+      path: LockedCapture/LockedCapture.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.devin.camera.notboring]
+    info:
+      path: LockedCapture/Info.plist
+      properties:
+        CFBundleDisplayName: "!Camera Capture"
+        NSCameraUsageDescription: "!Camera uses the camera to take photos."
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.lockedcamera-capture
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.devin.camera.notboring.lockedcapture
+        TARGETED_DEVICE_FAMILY: "1"
