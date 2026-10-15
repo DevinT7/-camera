@@ -10,7 +10,7 @@ enum ManualParam: String, CaseIterable, Identifiable {
 }
 
 struct RenderState {
-    var style: CameraStyle = Styles.builtIn[0]
+    var style: CameraStyle = Styles.all[0]
     var zebra = false
     var peaking = false
     var histogram = false
@@ -29,7 +29,7 @@ final class CameraModel: NSObject, ObservableObject {
     @Published var isManual = false { didSet { applyModeChange() } }
     @Published var param: ManualParam = .ev
     @Published var flash: FlashSetting = .off
-    @Published var styles: [CameraStyle] = Styles.builtIn
+    @Published var styles: [CameraStyle] = Styles.all
     @Published var styleIndex = 0 { didSet { pushRenderState() } }
     @Published var histogram: [Float] = Array(repeating: 0, count: 32)
     @Published var lastImage: UIImage?
@@ -94,7 +94,7 @@ final class CameraModel: NSObject, ObservableObject {
         layerProbe = AVCaptureVideoPreviewLayer(session: session)
         layerProbe.videoGravity = .resizeAspectFill
         super.init()
-        styles = Styles.builtIn + Styles.loadCustom()
+        styles = Styles.all + Styles.loadCustom()
         if settings.rememberSettings {
             styleIndex = styles.firstIndex { $0.id == settings.lastStyleID } ?? 0
             flash = settings.lastFlash
@@ -127,6 +127,8 @@ final class CameraModel: NSObject, ObservableObject {
         sessionQueue.async {
             if !self.configured { self.configure(position: .back); self.configured = true }
             if !self.session.isRunning { self.session.startRunning() }
+            // Re-apply a remembered Manual mode now that the session is actually running.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { if self.isManual { self.applyModeChange() } }
         }
     }
 
@@ -156,18 +158,13 @@ final class CameraModel: NSObject, ObservableObject {
             videoOutput.setSampleBufferDelegate(self, queue: videoQueue)
             session.addOutput(videoOutput)
         }
-        if let c = videoOutput.connection(with: .video) {
-            if c.isVideoRotationAngleSupported(90) { c.videoRotationAngle = 90 }
-            if c.isVideoMirroringSupported {
-                c.automaticallyAdjustsVideoMirroring = false
-                c.isVideoMirrored = pos == .front
-            }
-        }
         if photoOutput.isAppleProRAWSupported { photoOutput.isAppleProRAWEnabled = true }
         if let dims = dev.activeFormat.supportedMaxPhotoDimensions.last { photoOutput.maxPhotoDimensions = dims }
         session.commitConfiguration()
+        applyOrientation(for: pos)
 
         device = dev
+        rotationCoordinator = AVCaptureDevice.RotationCoordinator(device: dev, previewLayer: nil)
         installCameraControls(dev)
         // Continuous zoom range, expressed relative to the main (1x) lens.
         var base: CGFloat = 1
@@ -191,6 +188,21 @@ final class CameraModel: NSObject, ObservableObject {
             self.minZoom = lo; self.maxZoom = hi; self.zoom = startZoom
             self.minFocusMM = minFocus
             self.applyEV()
+        }
+    }
+
+    /// Portrait + selfie mirroring. Must run after commitConfiguration: swapping inputs rebuilds the connections,
+    /// so values set before the commit land on the old (discarded) connections and the front camera comes up sideways.
+    private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
+
+    private func applyOrientation(for pos: AVCaptureDevice.Position) {
+        for out in [videoOutput as AVCaptureOutput, photoOutput] {
+            guard let c = out.connection(with: .video) else { continue }
+            if c.isVideoRotationAngleSupported(90) { c.videoRotationAngle = 90 }
+            if c.isVideoMirroringSupported {
+                c.automaticallyAdjustsVideoMirroring = false
+                c.isVideoMirrored = pos == .front && out === videoOutput
+            }
         }
     }
 
@@ -301,12 +313,13 @@ final class CameraModel: NSObject, ObservableObject {
 
     private func applyModeChange() {
         if !isManual { param = .ev; touched = touched.intersection([.ev]) }
+        pushRenderState()
         settings.lastManual = isManual
         sessionQueue.async {
             guard let d = self.device else { return }
             try? d.lockForConfiguration()
             if self.isManual {
-                d.exposureMode = .custom; self.applyManualExposureLocked(d)
+                if d.isExposureModeSupported(.custom) { d.exposureMode = .custom; self.applyManualExposureLocked(d) }
             } else {
                 if d.isExposureModeSupported(.continuousAutoExposure) { d.exposureMode = .continuousAutoExposure }
                 if d.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) { d.whiteBalanceMode = .continuousAutoWhiteBalance }
@@ -337,6 +350,8 @@ final class CameraModel: NSObject, ObservableObject {
     }
 
     private func applyManualExposureLocked(_ d: AVCaptureDevice) {
+        // Calling this when custom exposure isn't available (session not running yet, some front cameras) raises an NSException.
+        guard d.isExposureModeSupported(.custom) else { return }
         let iso = isoLadder[min(isoIndex, isoLadder.count - 1)]
         let dur = shutterLadder[min(shutterIndex, shutterLadder.count - 1)]
         d.setExposureModeCustom(duration: CMTime(seconds: dur, preferredTimescale: 1_000_000_000),
@@ -368,15 +383,14 @@ final class CameraModel: NSObject, ObservableObject {
 
     func pushRenderState() {
         settings.lastStyleID = style.id
-        let st = RenderState(style: style, zebra: settings.zebra && isManualOrAlways, peaking: settings.focusPeaking && isManualOrAlways, histogram: settings.histogram)
+        let st = RenderState(style: style, zebra: settings.zebra && isManual, peaking: settings.focusPeaking && isManual, histogram: settings.histogram)
         videoQueue.async { self.renderState = st }
     }
-    private var isManualOrAlways: Bool { true }
 
     // MARK: Capture
     func capture() {
         if captureMode == .video { toggleRecording(); return }
-        guard !capturing else { return }
+        guard hasCamera, !capturing else { return }
         capturing = true
         Feedback.shutter()
         let wantSuper = settings.pipeline == .superRaw && abs(zoom - 1) < 0.05 && position == .back
@@ -386,6 +400,10 @@ final class CameraModel: NSObject, ObservableObject {
         let dims = photoOutput.maxPhotoDimensions
         sessionQueue.async {
             self.pendingRaw = nil; self.pendingProcessed = nil
+            // The UI is portrait-locked but the saved photo should be upright however the phone is held.
+            if let c = self.photoOutput.connection(with: .video), let angle = self.rotationCoordinator?.videoRotationAngleForHorizonLevelCapture, c.isVideoRotationAngleSupported(angle) {
+                c.videoRotationAngle = angle
+            }
             let s: AVCapturePhotoSettings
             let bayer = self.photoOutput.availableRawPhotoPixelFormatTypes.first { !AVCapturePhotoOutput.isAppleProRAWPixelFormat($0) }
             let pro = self.photoOutput.availableRawPhotoPixelFormatTypes.first { AVCapturePhotoOutput.isAppleProRAWPixelFormat($0) }
@@ -407,7 +425,13 @@ final class CameraModel: NSObject, ObservableObject {
 
     private func finish(raw: Data?, processed: Data?, superRaw: Bool) {
         let s = settings
-        let style = self.style
+        var style = self.style
+        switch s.dateStamp { case .on: style.fx.stamp = "date"; case .off: style.fx.stamp = nil; case .style: break }
+        switch s.lightLeaks {
+        case .off: style.fx.leak = 0
+        case .random: style.fx.leak = Float.random(in: 0.35...0.95); style.fx.leakCorner = Int.random(in: 0..<4)
+        case .style: break
+        }
         var image: CIImage?
         if superRaw, let raw, let f = CIRAWFilter(imageData: raw, identifierHint: "com.adobe.raw-image") {
             f.isGamutMappingEnabled = true
@@ -421,10 +445,21 @@ final class CameraModel: NSObject, ObservableObject {
         img = Styles.apply(style, to: img)
         if superRaw { img = Styles.addGrain(max(style.grain, 0.12), to: img) } else if style.grain > 0 { img = Styles.addGrain(style.grain * 0.6, to: img) }
         img = crop(img, to: s.aspect.ratio)
+        img = Styles.decorate(style.fx, img)
         let p3 = CGColorSpace(name: CGColorSpace.displayP3)!
         let heic: Data? = s.hdr
             ? try? ciContext.heif10Representation(of: img, colorSpace: p3, options: [:])
             : ciContext.heifRepresentation(of: img, format: .RGBA8, colorSpace: p3, options: [:])
+        if s.filmRoll, let heic {
+            // Film roll: no thumbnail, no review. The frame goes into the roll and shows up in Photos once developed.
+            let name = RollStore.write(heic)
+            DispatchQueue.main.async {
+                if let name { RollStore.shared.add(file: name) }
+                self.capturing = false
+                StatsStore.shared.recordPhoto(styleID: style.id, manual: self.isManual, superRaw: superRaw, zoom: Double(self.zoom))
+            }
+            return
+        }
         let thumb = ciContext.createCGImage(img.transformed(by: CGAffineTransform(scaleX: 0.25, y: 0.25)), from: img.transformed(by: CGAffineTransform(scaleX: 0.25, y: 0.25)).extent).map(UIImage.init(cgImage:))
         let rawToSave = s.rawPlusHeic ? raw : nil
         if let heic { save(heic: heic, dng: rawToSave) }
@@ -442,12 +477,15 @@ final class CameraModel: NSObject, ObservableObject {
     private func crop(_ img: CIImage, to ratio: CGFloat) -> CIImage {
         let e = img.extent
         var w = e.width, h = e.height
+        let ratio = e.width > e.height ? 1 / ratio : ratio   // landscape shots keep the same aspect, turned
         if w / h > ratio { w = h * ratio } else { h = w / ratio }
         let r = CGRect(x: e.midX - w / 2, y: e.midY - h / 2, width: w, height: h).integral
         return img.cropped(to: r).transformed(by: CGAffineTransform(translationX: -r.minX, y: -r.minY))
     }
 
-    private func save(heic: Data, dng: Data?) {
+    private func save(heic: Data, dng: Data?) { Self.saveToLibrary(heic: heic, dng: dng) }
+
+    static func saveToLibrary(heic: Data, dng: Data?, completion: ((Bool) -> Void)? = nil) {
         PHPhotoLibrary.shared().performChanges({
             let req = PHAssetCreationRequest.forAsset()
             req.addResource(with: .photo, data: heic, options: nil)
@@ -462,7 +500,7 @@ final class CameraModel: NSObject, ObservableObject {
             } else {
                 PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle: "!Camera").addAssets([ph] as NSArray)
             }
-        }, completionHandler: nil)
+        }, completionHandler: { ok, _ in completion?(ok) })
     }
 }
 
@@ -484,6 +522,11 @@ extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAu
         guard let pb = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         let st = renderState
         var img = CIImage(cvPixelBuffer: pb)
+        // The UI is portrait-only. If the connection rotation didn't take (the front camera after a flip), the buffer arrives
+        // landscape; turn it upright here, mirroring the selfie like the system camera does.
+        if CVPixelBufferGetWidth(pb) > CVPixelBufferGetHeight(pb) {
+            img = img.oriented(device?.position == .front ? .leftMirrored : .right)
+        }
         img = Styles.apply(st.style, to: img)
         if isRecording { appendVideo(img, at: CMSampleBufferGetPresentationTimeStamp(sampleBuffer)) }
         frameCount += 1

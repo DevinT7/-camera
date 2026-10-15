@@ -24,6 +24,7 @@
 		67C178C1ADE841BEA39A0234 /* NotBoringLockedCapture.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 09472209BF7451D388D0F42E /* NotBoringLockedCapture.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		8B541C2478D767CBE04F71A7 /* Achievements.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6D9A08F605BDD3E1FAA456D /* Achievements.swift */; };
 		95D7D7829F206112558CF025 /* PhotoLabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ECFCDC7117B9D464075F59A /* PhotoLabView.swift */; };
+		981548D53D2D1F8CB391DA60 /* filter-sample.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 08A570B5F659605915BD9FCD /* filter-sample.jpg */; };
 		A120610EBAA60F938D1AA735 /* SharedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 252453FADEB8003D76075B3C /* SharedStore.swift */; };
 		ABD69503401AC7DA581E5B2E /* CaptureIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41855A947E9008B0E6616AB4 /* CaptureIntent.swift */; };
 		AEBF0CA75EA5CC4F87B055FC /* Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA2A49FB31318C6EA043928E /* Settings.swift */; };
@@ -33,6 +34,7 @@
 		D56D71AE239DB597CF707CD3 /* Controls.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE84DBE6D9B5D161BF5CB8F9 /* Controls.swift */; };
 		D8235DB991FEA74A822A7444 /* NotBoringCameraApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C69E82211BBFD752AC3F6A /* NotBoringCameraApp.swift */; };
 		EF9C363BAEEA87501930E250 /* NotBoringWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = DA0EB8B7D338033EE0D8E946 /* NotBoringWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		F915E7D8289C2F91DEDE24A9 /* Roll.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1702F0D65BDEAB7CEAED0C32 /* Roll.swift */; };
 		FFC55B5C16F6FBC4D2B2EB5B /* AppIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB5732D948E023C4E7141E11 /* AppIntegration.swift */; };
 /* End PBXBuildFile section */
 
@@ -70,9 +72,11 @@
 
 /* Begin PBXFileReference section */
 		04B1C49C2004FDF28B92F812 /* PreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewView.swift; sourceTree = "<group>"; };
+		08A570B5F659605915BD9FCD /* filter-sample.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "filter-sample.jpg"; sourceTree = "<group>"; };
 		09472209BF7451D388D0F42E /* NotBoringLockedCapture.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = NotBoringLockedCapture.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		11E52EB7B07639EC7F99FBA9 /* ColorwayShare.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorwayShare.swift; sourceTree = "<group>"; };
 		167BC31B348D7E8C8A7D3A28 /* NotBoringCamera.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = NotBoringCamera.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1702F0D65BDEAB7CEAED0C32 /* Roll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Roll.swift; sourceTree = "<group>"; };
 		252453FADEB8003D76075B3C /* SharedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedStore.swift; sourceTree = "<group>"; };
 		2AF851B6A8A736107F260793 /* LockedCapture.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LockedCapture.entitlements; sourceTree = "<group>"; };
 		33DC86E2C3FB740F9368D1F4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -120,6 +124,14 @@
 			path = Widgets;
 			sourceTree = "<group>";
 		};
+		65AEBDBF507DE9D0F7FF33B5 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				08A570B5F659605915BD9FCD /* filter-sample.jpg */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		6AE7BCB4D78191FE5E59D711 /* Camera */ = {
 			isa = PBXGroup;
 			children = (
@@ -144,6 +156,7 @@
 			isa = PBXGroup;
 			children = (
 				D6D9A08F605BDD3E1FAA456D /* Achievements.swift */,
+				1702F0D65BDEAB7CEAED0C32 /* Roll.swift */,
 				BA2A49FB31318C6EA043928E /* Settings.swift */,
 				776CC998FD73D5EB73936F99 /* Styles.swift */,
 				BCE302B701320F9B68596B82 /* Theme.swift */,
@@ -182,6 +195,7 @@
 				B6BC84849D22B96F2EF06A14 /* App */,
 				6AE7BCB4D78191FE5E59D711 /* Camera */,
 				8F44BD3827B91C0E583A39D6 /* Core */,
+				65AEBDBF507DE9D0F7FF33B5 /* Resources */,
 				A65DC4B0ABCC4684BA579021 /* UI */,
 			);
 			path = NotBoringCamera;
@@ -274,15 +288,15 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					1007E4B60DD6393F20602FF0 = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = F4Q68YM222;
 						ProvisioningStyle = Automatic;
 					};
 					3E71F4F678542A2744286A80 = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = F4Q68YM222;
 						ProvisioningStyle = Automatic;
 					};
 					BE6CD17FB710C58AACBF4773 = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = F4Q68YM222;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -314,6 +328,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				0971976ED4316A88EEAB654C /* Assets.xcassets in Resources */,
+				981548D53D2D1F8CB391DA60 /* filter-sample.jpg in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -346,6 +361,7 @@
 				D8235DB991FEA74A822A7444 /* NotBoringCameraApp.swift in Sources */,
 				95D7D7829F206112558CF025 /* PhotoLabView.swift in Sources */,
 				58ED5F5080349F9B37A97A1E /* PreviewView.swift in Sources */,
+				F915E7D8289C2F91DEDE24A9 /* Roll.swift in Sources */,
 				AEBF0CA75EA5CC4F87B055FC /* Settings.swift in Sources */,
 				CBA84BA782D53F6A8DA5DBE7 /* SettingsView.swift in Sources */,
 				5ACCC8E51917CB52D98159B7 /* SharedStore.swift in Sources */,
@@ -384,7 +400,6 @@
 		0C89434D6E5C604D511CACCD /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = LockedCapture/LockedCapture.entitlements;
 				INFOPLIST_FILE = LockedCapture/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -433,7 +448,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = F4Q68YM222;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -465,7 +480,6 @@
 		55C1E2C0A2F6C0A4981EF840 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = LockedCapture/LockedCapture.entitlements;
 				INFOPLIST_FILE = LockedCapture/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -482,7 +496,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = NotBoringCamera/NotBoringCamera.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_FILE = NotBoringCamera/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -498,7 +511,6 @@
 		8D586743AB9C736C8225B9E4 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = Widgets/Widgets.entitlements;
 				INFOPLIST_FILE = Widgets/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -515,7 +527,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = NotBoringCamera/NotBoringCamera.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_FILE = NotBoringCamera/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -531,7 +542,6 @@
 		DF20085D7720EAEDCE4559C6 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = Widgets/Widgets.entitlements;
 				INFOPLIST_FILE = Widgets/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -580,7 +590,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = F4Q68YM222;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;

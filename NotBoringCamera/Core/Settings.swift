@@ -26,6 +26,9 @@ enum AspectOption: String, CaseIterable, Identifiable {
     }
 }
 
+enum StampOption: String, CaseIterable, Identifiable { case style = "Per Style", off = "Off", on = "On"; var id: String { rawValue } }
+enum LeakOption: String, CaseIterable, Identifiable { case style = "Per Style", off = "Off", random = "Random"; var id: String { rawValue } }
+
 enum FlashSetting: String, CaseIterable { case off, auto, on }
 
 final class AppSettings: ObservableObject {
@@ -44,9 +47,13 @@ final class AppSettings: ObservableObject {
     @AppStorage("hdr") var hdr = false
     @AppStorage("hiRes") var hiRes = false
     @AppStorage("rawPlusHeic") var rawPlusHeic = false
-    @AppStorage("peaking") var focusPeaking = true
-    @AppStorage("zebra") var zebra = true
+    @AppStorage("peaking") var focusPeaking = false
+    @AppStorage("zebra") var zebra = false
     @AppStorage("histogram") var histogram = true
+    @AppStorage("dateStamp") var dateStamp: StampOption = .style
+    @AppStorage("lightLeaks") var lightLeaks: LeakOption = .style
+    @AppStorage("filmRoll") var filmRoll = false
+    @AppStorage("rollSize") var rollSize = 24
     @AppStorage("colorway") var colorwayID = "orange"
     @AppStorage("customColorways") private var customColorwaysData = Data()
 

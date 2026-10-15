@@ -11,12 +11,15 @@ struct SettingsView: View {
     @State private var newColorway = false
     @State private var scanning = false
     @State private var achievements = false
+    @ObservedObject private var roll = RollStore.shared
 
     var body: some View {
         NavigationStack {
             Form {
                 Section { Button { achievements = true } label: { Label("Achievements & Stickers", systemImage: "trophy.fill") } }
                 captureSection
+                lookSection
+                rollSection
                 controlsSection
                 colorwaySection
                 stylesSection
@@ -28,7 +31,7 @@ struct SettingsView: View {
             .fileImporter(isPresented: $importing, allowedContentTypes: [UTType(filenameExtension: "cube") ?? .data, .plainText, .data]) { r in
                 switch r {
                 case .success(let u):
-                    do { try Styles.importCube(from: u); model.styles = Styles.builtIn + Styles.loadCustom(); importError = nil; StatsStore.shared.recordLUTImport() }
+                    do { try Styles.importCube(from: u); model.styles = Styles.all + Styles.loadCustom(); importError = nil; StatsStore.shared.recordLUTImport() }
                     catch { importError = "That doesn't look like a 3D .cube LUT." }
                 case .failure(let e): importError = e.localizedDescription
                 }
@@ -52,6 +55,31 @@ struct SettingsView: View {
                     Toggle("Mirror front selfies", isOn: $s.mirrorSelfies)
                     Toggle("Save to “!Camera” album", isOn: $s.saveToAlbum)
                 }
+    }
+
+    @ViewBuilder private var lookSection: some View {
+        Section("Look") {
+            Picker("Date stamp", selection: $s.dateStamp) { ForEach(StampOption.allCases) { Text($0.rawValue).tag($0) } }
+            Picker("Light leaks", selection: $s.lightLeaks) { ForEach(LeakOption.allCases) { Text($0.rawValue).tag($0) } }
+            Text("Date stamps and leaks are burned into saved photos. “Random” gives every shot a different leak from a random corner.").font(.footnote).foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder private var rollSection: some View {
+        Section("Film Roll") {
+            Toggle("Film roll mode", isOn: $s.filmRoll)
+            Text("A fixed number of frames. No preview, no deleting. Shots are held back and “developed” into Photos 24 hours after the last frame.").font(.footnote).foregroundStyle(.secondary)
+            if s.filmRoll {
+                Picker("Frames per roll", selection: $s.rollSize) { Text("24").tag(24); Text("36").tag(36) }.pickerStyle(.segmented)
+                LabeledContent("On the roll", value: "\(roll.framesShot) of \(roll.current?.size ?? s.rollSize) shot")
+                if roll.pendingFrames > 0 {
+                    LabeledContent("Waiting to develop", value: "\(roll.pendingFrames) frames")
+                    if let d = roll.nextDevelop { LabeledContent("Next develop", value: d.formatted(date: .abbreviated, time: .shortened)) }
+                    Button("Finish this roll early") { roll.rewind() }.disabled(roll.framesShot == 0)
+                    Button("Develop everything now", role: .destructive) { roll.developDue(force: true) }
+                }
+            }
+        }
     }
 
     @ViewBuilder private var controlsSection: some View {

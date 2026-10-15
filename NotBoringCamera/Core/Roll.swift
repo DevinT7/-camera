@@ -1,0 +1,88 @@
+import Foundation
+import Photos
+import UIKit
+
+/// A roll of film: shots go to private storage (no preview, no deleting) and are "developed" into Photos 24h after the last frame.
+struct FilmRoll: Codable, Identifiable {
+    var id = UUID()
+    var size: Int
+    var files: [String] = []
+    var lastShot: Date?
+    var developAt: Date? { lastShot.map { $0.addingTimeInterval(RollStore.developDelay) } }
+    var isFull: Bool { files.count >= size }
+}
+
+@MainActor
+final class RollStore: ObservableObject {
+    static let shared = RollStore()
+    static let developDelay: TimeInterval = 24 * 3600
+
+    @Published private(set) var rolls: [FilmRoll] = []
+    @Published var developedCount: Int?
+
+    private static let dir: URL = {
+        let d = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("FilmRolls", isDirectory: true)
+        try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
+        return d
+    }()
+    private static var indexURL: URL { dir.appendingPathComponent("index.json") }
+
+    init() {
+        if let d = try? Data(contentsOf: Self.indexURL), let r = try? JSONDecoder().decode([FilmRoll].self, from: d) { rolls = r }
+    }
+
+    /// The roll in the camera right now (nil until the first frame of a new one is shot).
+    var current: FilmRoll? { rolls.last { !$0.isFull } }
+    var framesShot: Int { current?.files.count ?? 0 }
+    var framesLeft: Int { (current?.size ?? AppSettings.shared.rollSize) - framesShot }
+    var pendingFrames: Int { rolls.reduce(0) { $0 + $1.files.count } }
+    var nextDevelop: Date? { rolls.compactMap(\.developAt).min() }
+
+    nonisolated static func write(_ data: Data) -> String? {
+        let name = UUID().uuidString + ".heic"
+        do { try data.write(to: dir.appendingPathComponent(name), options: .atomic); return name } catch { return nil }
+    }
+
+    func add(file: String) {
+        if current == nil { rolls.append(FilmRoll(size: AppSettings.shared.rollSize)) }
+        let i = rolls.count - 1
+        rolls[i].files.append(file)
+        rolls[i].lastShot = Date()
+        if rolls[i].isFull { StatsStore.shared.recordFullRoll() }
+        persist()
+    }
+
+    /// Ends the current roll early; it develops 24h after its last frame like any other.
+    func rewind() {
+        guard let i = rolls.lastIndex(where: { !$0.isFull }), !rolls[i].files.isEmpty else { return }
+        rolls[i].size = rolls[i].files.count
+        persist()
+    }
+
+    func developDue(force: Bool = false) {
+        let now = Date()
+        let due = rolls.filter { !$0.files.isEmpty && (force || ($0.developAt ?? .distantFuture) <= now) }
+        guard !due.isEmpty else { return }
+        for roll in due {
+            let urls = roll.files.map { Self.dir.appendingPathComponent($0) }
+            let blobs = urls.compactMap { try? Data(contentsOf: $0) }
+            let group = DispatchGroup()
+            var failed = false
+            for d in blobs {
+                group.enter()
+                CameraModel.saveToLibrary(heic: d, dng: nil) { ok in if !ok { failed = true }; group.leave() }
+            }
+            group.notify(queue: .main) { [weak self] in
+                guard let self, !failed else { return }
+                urls.forEach { try? FileManager.default.removeItem(at: $0) }
+                self.rolls.removeAll { $0.id == roll.id }
+                self.persist()
+                self.developedCount = (self.developedCount ?? 0) + blobs.count
+                StatsStore.shared.recordRollDeveloped()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4) { self.developedCount = nil }
+            }
+        }
+    }
+
+    private func persist() { try? JSONEncoder().encode(rolls).write(to: Self.indexURL, options: .atomic) }
+}

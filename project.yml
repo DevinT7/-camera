@@ -6,7 +6,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    DEVELOPMENT_TEAM: ""
+    DEVELOPMENT_TEAM: F4Q68YM222
     CODE_SIGN_STYLE: Automatic
 targets:
   NotBoringCamera:
@@ -16,10 +16,6 @@ targets:
     dependencies:
       - target: NotBoringWidgets
       - target: NotBoringLockedCapture
-    entitlements:
-      path: NotBoringCamera/NotBoringCamera.entitlements
-      properties:
-        com.apple.security.application-groups: [group.com.devin.camera.notboring]
     info:
       path: NotBoringCamera/Info.plist
       properties:
@@ -44,10 +40,6 @@ targets:
     type: app-extension
     platform: iOS
     sources: [Widgets, Shared]
-    entitlements:
-      path: Widgets/Widgets.entitlements
-      properties:
-        com.apple.security.application-groups: [group.com.devin.camera.notboring]
     info:
       path: Widgets/Info.plist
       properties:
@@ -62,10 +54,6 @@ targets:
     type: app-extension
     platform: iOS
     sources: [LockedCapture, Shared]
-    entitlements:
-      path: LockedCapture/LockedCapture.entitlements
-      properties:
-        com.apple.security.application-groups: [group.com.devin.camera.notboring]
     info:
       path: LockedCapture/Info.plist
       properties:

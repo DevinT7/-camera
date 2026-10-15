@@ -9,9 +9,14 @@ struct CameraView: View {
     @State private var showLab = false
     @State private var showAchievements = false
     @ObservedObject private var stats = StatsStore.shared
+    @ObservedObject private var roll = RollStore.shared
     @State private var pinchBase: CGFloat?
     @State private var focusDragBase: Float?
     @State private var styleToast = false
+    @State private var styleToastToken = 0
+    @State private var zoomReadout = false
+    @State private var zoomReadoutToken = 0
+    @State private var zoomDragBase: CGFloat?
     @Environment(\.scenePhase) private var scenePhase
 
     private var cw: Colorway { settings.colorway }
@@ -21,8 +26,7 @@ struct CameraView: View {
             cw.bodyColor.ignoresSafeArea()
             VStack(spacing: 10) {
                 topBar
-                viewfinder
-                modeToggle
+                viewfinder.padding(.horizontal, -10)   // nearly edge to edge
                 if model.isManual { manualStrip.transition(.move(edge: .bottom).combined(with: .opacity)) }
                 controls
                 switches
@@ -33,15 +37,15 @@ struct CameraView: View {
         .preferredColorScheme(cw.isDarkBody ? .dark : .light)
         .animation(.easeInOut(duration: 0.2), value: model.isManual)
         .animation(.spring(), value: stats.justUnlocked?.id)
-        .onAppear { model.start(); UIApplication.shared.isIdleTimerDisabled = settings.keepAwake }
+        .onAppear { model.start(); RollStore.shared.developDue(); UIApplication.shared.isIdleTimerDisabled = settings.keepAwake }
         .onChange(of: settings.keepAwake) { _, v in UIApplication.shared.isIdleTimerDisabled = v }
-        .onChange(of: scenePhase) { _, p in p == .active ? model.start() : model.stop() }
+        .onChange(of: scenePhase) { _, p in if p == .active { model.start(); RollStore.shared.developDue() } else { model.stop() } }
         .onChange(of: settings.zebra) { _, _ in model.pushRenderState() }
         .onChange(of: settings.focusPeaking) { _, _ in model.pushRenderState() }
         .onChange(of: settings.histogram) { _, _ in model.pushRenderState() }
         .sheet(isPresented: $showSettings) { SettingsView().environmentObject(settings).environmentObject(model) }
         .sheet(isPresented: $showAchievements) { AchievementsView() }
-        .overlay(alignment: .top) { unlockToast }
+        .overlay(alignment: .top) { unlockToast; developedToast }
         .sheet(isPresented: $showLab) { PhotoLabView().environmentObject(settings).environmentObject(model) }
     }
 
@@ -59,33 +63,56 @@ struct CameraView: View {
         }
     }
 
+    @ViewBuilder private var developedToast: some View {
+        if let n = roll.developedCount {
+            HStack(spacing: 10) {
+                Image(systemName: "photo.stack.fill").font(.system(size: 24)).foregroundStyle(cw.accentColor)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Roll developed").font(.system(size: 10, weight: .heavy, design: .rounded)).foregroundStyle(.secondary)
+                    Text("\(n) photos are in your library").font(.system(size: 15, weight: .heavy, design: .rounded))
+                }
+            }
+            .padding(10).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18)).padding(.top, 54)
+            .transition(.move(edge: .top).combined(with: .opacity))
+        }
+    }
+
+    private var rollBadge: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "film.fill").font(.system(size: 11, weight: .bold))
+            Text("\(roll.framesLeft)").font(.system(size: 13, weight: .heavy, design: .rounded)).monospacedDigit()
+        }
+        .foregroundStyle(.white).padding(.horizontal, 10).padding(.vertical, 5)
+        .background(.black.opacity(0.45), in: Capsule())
+        .accessibilityLabel("\(roll.framesLeft) frames left on the roll")
+    }
+
     // MARK: Photo / Video switch (always visible so the current mode is obvious)
     private var modeToggle: some View {
         HStack(spacing: 0) {
             ForEach([CaptureMode.photo, .video], id: \.self) { m in
                 let on = model.captureMode == m
-                HStack(spacing: 6) {
-                    Image(systemName: m == .photo ? "camera.fill" : "video.fill").font(.system(size: 11, weight: .bold))
-                    Text(m == .photo ? "PHOTO" : "VIDEO").font(.system(size: 11, weight: .heavy, design: .rounded)).tracking(1)
-                }
-                .frame(width: 94, height: 28)
-                .background(on ? (m == .video ? Color(hex: "FF3B30") : cw.dialColor) : .clear, in: Capsule())
-                .foregroundStyle(on ? .white : cw.ink.opacity(0.6))
-                .contentShape(Capsule())
-                .onTapGesture { model.setMode(m) }
+                Image(systemName: m == .photo ? "camera.fill" : "video.fill").font(.system(size: 14, weight: .bold))
+                    .frame(width: 40, height: 34)
+                    .background(on ? (m == .video ? Color(hex: "FF3B30") : cw.dialColor) : .clear, in: Capsule())
+                    .foregroundStyle(on ? .white : cw.ink.opacity(0.6))
+                    .contentShape(Capsule())
+                    .onTapGesture { model.setMode(m); Feedback.toggle() }
+                    .accessibilityLabel(m == .photo ? "Photo" : "Video")
             }
         }
-        .padding(2).background(cw.panelColor, in: Capsule())
+        .padding(3).background(cw.panelColor, in: Capsule())
         .opacity(model.isRecording ? 0.4 : 1).allowsHitTesting(!model.isRecording)
         .animation(.easeInOut(duration: 0.2), value: model.captureMode)
     }
 
     // MARK: Top bar
     private var topBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             roundButton("gearshape.fill") { showSettings = true }
             roundButton("trophy.fill") { showAchievements = true }
             Spacer()
+            modeToggle
             Menu {
                 ForEach(CapturePipeline.allCases) { p in
                     Button { settings.pipeline = p } label: { Label(p.rawValue, systemImage: settings.pipeline == p ? "checkmark" : "") }
@@ -97,16 +124,16 @@ struct CameraView: View {
                 }
                 Picker("Aspect", selection: $settings.aspect) { ForEach(AspectOption.allCases) { Text($0.rawValue).tag($0) } }
             } label: {
-                Text(formatLabel).font(.system(size: 12, weight: .heavy, design: .rounded)).tracking(0.5)
-                    .padding(.horizontal, 12).padding(.vertical, 7)
-                    .background(cw.panelColor, in: Capsule()).foregroundStyle(cw.ink)
+                Text(settings.aspect.rawValue).font(.system(size: 12, weight: .heavy, design: .rounded)).lineLimit(1).minimumScaleFactor(0.8)
+                    .foregroundStyle(cw.ink).frame(width: 40, height: 40)
+                    .background(cw.panelColor, in: RoundedRectangle(cornerRadius: 10))
             }
             Spacer()
             Button { model.flip(); Feedback.toggle() } label: { icon("arrow.triangle.2.circlepath.camera.fill") }
             Button { showLab = true; Feedback.toggle() } label: {
                 ZStack {
                     RoundedRectangle(cornerRadius: 10).fill(cw.panelColor)
-                    if let img = model.lastImage { Image(uiImage: img).resizable().scaledToFill().clipShape(RoundedRectangle(cornerRadius: 10)) }
+                    if !settings.filmRoll, let img = model.lastImage { Image(uiImage: img).resizable().scaledToFill().clipShape(RoundedRectangle(cornerRadius: 10)) }
                     else { Image(systemName: "wand.and.stars").foregroundStyle(cw.ink) }
                 }
                 .frame(width: 40, height: 40)
@@ -147,10 +174,8 @@ struct CameraView: View {
                         .padding(.horizontal, 10).padding(.vertical, 5).background(Color.red, in: Capsule())
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top).padding(.top, 12)
                 }
-                if styleToast {
-                    Text(model.style.name.uppercased()).font(.system(size: 22, weight: .black, design: .rounded)).foregroundStyle(.white)
-                        .shadow(radius: 6).transition(.opacity)
-                }
+                if settings.filmRoll && model.captureMode == .photo { rollBadge.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing).padding(12) }
+                StylePickerOverlay(styles: model.styles, index: $model.styleIndex, accent: cw.accentColor, visible: styleToast)
             }
             .frame(width: size.width, height: size.height)
             .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
@@ -171,6 +196,7 @@ struct CameraView: View {
                     model.styleIndex = (model.styleIndex + (v.translation.width < 0 ? 1 : n - 1)) % n
                     Feedback.tick(); return
                 }
+                if styleToast, hypot(v.translation.width, v.translation.height) < 6 { withAnimation { styleToast = false }; return }
                 if focusDragBase != nil { focusDragBase = nil; model.endManualFocus() }
                 else if hypot(v.translation.width, v.translation.height) < 6 { model.tapFocus(at: v.location, in: size); Feedback.click() }
             })
@@ -190,29 +216,43 @@ struct CameraView: View {
     }
 
     // MARK: Zoom: continuous. Presets are shortcuts, the ruler/pinch give every in-between value.
+    /// Fixed-size stop buttons (nothing resizes while zooming, which is what made the old bar jump) with a
+    /// separate readout above that shows the exact zoom while it's changing.
     private var zoomBar: some View {
-        HStack(spacing: 6) {
-            ForEach(model.quickZoomStops, id: \.self) { s in
-                let active = abs(model.zoom - s) < 0.03
-                Text(active ? zoomText(model.zoom) : fmt(s))
-                    .font(.system(size: 13, weight: .heavy, design: .rounded)).frame(minWidth: 34)
-                    .padding(.vertical, 7).padding(.horizontal, 6)
-                    .background(active ? cw.accentColor : .black.opacity(0.4), in: Capsule())
-                    .foregroundStyle(active ? .black : .white)
-                    .onTapGesture { model.setZoom(s, ramp: true); Feedback.tick() }
+        let stops = model.quickZoomStops
+        return VStack(spacing: 6) {
+            Text(zoomText(model.zoom))
+                .font(.system(size: 13, weight: .heavy, design: .rounded)).monospacedDigit()
+                .padding(.vertical, 4).padding(.horizontal, 10)
+                .background(cw.accentColor, in: Capsule()).foregroundStyle(.black)
+                .opacity(zoomReadout ? 1 : 0).scaleEffect(zoomReadout ? 1 : 0.85)
+                .animation(.easeOut(duration: 0.2), value: zoomReadout)
+            HStack(spacing: 4) {
+                ForEach(stops, id: \.self) { s in
+                    let active = abs(model.zoom - s) < 0.03
+                    Text(fmt(s) + (active ? "×" : ""))
+                        .font(.system(size: 13, weight: .heavy, design: .rounded)).monospacedDigit()
+                        .frame(width: 42, height: 32)
+                        .background(Capsule().fill(active ? cw.accentColor : .clear))
+                        .foregroundStyle(active ? .black : .white)
+                        .contentShape(Capsule())
+                        .onTapGesture { model.setZoom(s, ramp: true); Feedback.tick() }
+                }
             }
-            let onStop = model.quickZoomStops.contains { abs(model.zoom - $0) < 0.03 }
-            if !onStop {
-                Text(zoomText(model.zoom)).font(.system(size: 13, weight: .heavy, design: .rounded))
-                    .padding(.vertical, 7).padding(.horizontal, 10).background(cw.accentColor, in: Capsule()).foregroundStyle(.black)
-            }
+            .animation(.easeOut(duration: 0.15), value: stops.map { abs(model.zoom - $0) < 0.03 })
+            .padding(4).background(.black.opacity(0.35), in: Capsule())
+            .highPriorityGesture(DragGesture(minimumDistance: 6).onChanged { v in
+                if zoomDragBase == nil { zoomDragBase = model.zoom }
+                let span = log(max(model.maxZoom / model.minZoom, 1.01))
+                model.setZoom((zoomDragBase ?? 1) * exp(v.translation.width / 260 * span))
+            }.onEnded { _ in zoomDragBase = nil })
         }
-        .padding(5).background(.black.opacity(0.28), in: Capsule())
-        .highPriorityGesture(DragGesture(minimumDistance: 4).onChanged { v in
-            if pinchBase == nil { pinchBase = model.zoom }
-            let span = log(max(model.maxZoom / model.minZoom, 1.01))
-            model.setZoom((pinchBase ?? 1) * exp(v.translation.width / 260 * span))
-        }.onEnded { _ in pinchBase = nil })
+        .onChange(of: model.zoom) { _, _ in
+            zoomReadout = true
+            zoomReadoutToken += 1
+            let t = zoomReadoutToken
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { if t == zoomReadoutToken { zoomReadout = false } }
+        }
     }
     private func fmt(_ s: CGFloat) -> String { s < 1 ? String(format: "%.1f", s).replacingOccurrences(of: "0.5", with: ".5") : String(Int(s)) }
     private func zoomText(_ z: CGFloat) -> String { String(format: z < 10 ? "%.1f×" : "%.0f×", z) }
@@ -294,15 +334,20 @@ struct CameraView: View {
             ShutterButton(colorway: cw, recording: model.isRecording) { model.capture() }
             Spacer()
             VStack(spacing: 6) {
-                Dial(label: "STYLE", count: model.styles.count, index: $model.styleIndex, color: cw.accentColor, ink: .black)
+                DrumWheel(count: model.styles.count, index: $model.styleIndex, color: cw.accentColor, panel: cw.panelColor, ink: .black, onTap: openStylePicker)
                 Text(model.style.name.uppercased()).font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(cw.ink).lineLimit(1)
             }
         }
         .padding(.horizontal, 4)
-        .onChange(of: model.styleIndex) { _, _ in
-            withAnimation { styleToast = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { withAnimation { styleToast = false } }
-        }
+        .onChange(of: model.styleIndex) { _, _ in openStylePicker() }
+    }
+
+    /// Show the look picker; it hides itself a few seconds after the last interaction.
+    private func openStylePicker() {
+        withAnimation { styleToast = true }
+        styleToastToken += 1
+        let token = styleToastToken
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { if token == styleToastToken { withAnimation { styleToast = false } } }
     }
 
     // MARK: Switches

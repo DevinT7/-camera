@@ -44,7 +44,7 @@ struct PhotoLabView: View {
                             .onLongPressGesture(minimumDuration: 0.15, maximumDistance: 40, pressing: { comparing = $0 }, perform: {})
                             .overlay(GeometryReader { g in ForEach($placed) { $p in StickerView(sticker: p.sticker, size: g.size.width * 0.2 * p.scale).position(x: p.x * g.size.width, y: p.y * g.size.height).gesture(DragGesture().onChanged { v in p.x = min(max(v.location.x / g.size.width, 0), 1); p.y = min(max(v.location.y / g.size.height, 0), 1) }).onTapGesture(count: 2) { p.scale = p.scale >= 2 ? 0.6 : p.scale + 0.4 }.contextMenu { Button("Remove", role: .destructive) { placed.removeAll { $0.id == p.id } } } } })
                     } else {
-                        PhotosPicker(selection: $item, matching: .images) { Label("Choose a photo", systemImage: "photo.on.rectangle").font(.headline) }
+                        LibraryGrid { data in setSource(data) }
                     }
                 }
                 .frame(maxHeight: .infinity)
@@ -58,15 +58,21 @@ struct PhotoLabView: View {
                             slider("Shadows", $shadows, -1...1)
                             Picker("Style", selection: $styleIndex) { ForEach(model.styles.indices, id: \.self) { Text(model.styles[$0].name).tag($0) } }.pickerStyle(.menu)
                             slider("Style strength", $strength, 0...1)
-                            HStack {
-                                Button { rotation = (rotation + 1) % 4 } label: { Label("Rotate", systemImage: "rotate.right") }
-                                Button { flipped.toggle() } label: { Label("Flip", systemImage: "arrow.left.and.right.righttriangle.left.righttriangle.right") }
-                                Menu("Crop") { Button("Original") { aspect = nil }; ForEach(AspectOption.allCases) { a in Button(a.rawValue) { aspect = a } } }
-                                Button("Reset") { reset() }
-                                Menu("Stickers") { ForEach(statsStore.unlockedStickers) { st in Button { placed.append(PlacedSticker(sticker: st)) } label: { Label(st.title, systemImage: st.symbol) } }; if statsStore.unlockedStickers.isEmpty { Text("Earn stickers with achievements") } }
-                            }.buttonStyle(.bordered)
                         }.padding(.horizontal)
-                    }.frame(maxHeight: 250)
+                    }.frame(maxHeight: 230)
+                    HStack(spacing: 8) {
+                            tool("Rotate", "rotate.right") { rotation = (rotation + 1) % 4 }
+                            tool("Flip", "arrow.left.and.right.righttriangle.left.righttriangle.right") { flipped.toggle() }
+                            Menu {
+                                Button("Original") { aspect = nil }
+                                ForEach(AspectOption.allCases) { a in Button(a.rawValue) { aspect = a } }
+                            } label: { toolLabel("Crop", "crop") }.buttonStyle(.plain)
+                            tool("Reset", "arrow.counterclockwise") { reset() }
+                            Menu {
+                                ForEach(statsStore.unlockedStickers) { st in Button { placed.append(PlacedSticker(sticker: st)) } label: { Label(st.title, systemImage: st.symbol) } }
+                                if statsStore.unlockedStickers.isEmpty { Text("Earn stickers with achievements") }
+                            } label: { toolLabel("Stickers", "face.smiling") }.buttonStyle(.plain)
+                    }.padding(.horizontal)
                     Text("Tap and hold the photo to compare with the original.").font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -85,14 +91,32 @@ struct PhotoLabView: View {
         }
     }
 
+    private func tool(_ title: String, _ symbol: String, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) { toolLabel(title, symbol) }.buttonStyle(.plain)
+    }
+
+    private func toolLabel(_ title: String, _ symbol: String) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: symbol).font(.system(size: 20))
+            Text(title).font(.caption2).lineLimit(1).fixedSize()
+        }
+        .foregroundStyle(.tint)
+        .frame(maxWidth: .infinity).padding(.vertical, 8)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
+    }
+
     private func slider(_ t: String, _ v: Binding<Double>, _ r: ClosedRange<Double>) -> some View {
-        HStack { Text(t).font(.caption).frame(width: 90, alignment: .leading); Slider(value: v, in: r) }
+        HStack { Text(t).font(.caption).lineLimit(1).minimumScaleFactor(0.8).frame(width: 100, alignment: .leading); Slider(value: v, in: r) }
     }
 
     private func load(_ i: PhotosPickerItem?) async {
-        guard let d = try? await i?.loadTransferable(type: Data.self),
-              let img = CIImage(data: d, options: [.applyOrientationProperty: true]) else { return }
-        source = img; reset()
+        guard let d = try? await i?.loadTransferable(type: Data.self) else { return }
+        setSource(d)
+    }
+
+    private func setSource(_ d: Data) {
+        guard let img = CIImage(data: d, options: [.applyOrientationProperty: true]) else { return }
+        source = img; saved = false; reset()
     }
 
     private func reset() {
@@ -162,4 +186,75 @@ struct PlacedSticker: Identifiable {
     var x: CGFloat = 0.5
     var y: CGFloat = 0.5
     var scale: CGFloat = 1
+}
+
+/// Every photo in the library, newest first. Tap one to edit it.
+struct LibraryGrid: View {
+    let onPick: (Data) -> Void
+    @State private var assets: PHFetchResult<PHAsset>?
+    @State private var denied = false
+    @State private var loading = false
+    @State private var manager = PHCachingImageManager()
+
+    var body: some View {
+        Group {
+            if let assets {
+                ScrollView {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 3), spacing: 2) {
+                        ForEach(0..<assets.count, id: \.self) { i in
+                            let a = assets.object(at: i)
+                            Color.clear.aspectRatio(1, contentMode: .fit)
+                                .overlay(GridThumb(asset: a, manager: manager))
+                                .clipped().contentShape(Rectangle())
+                                .onTapGesture { pick(a) }
+                        }
+                    }
+                }.overlay { if loading { ProgressView().tint(.white).controlSize(.large) } }
+            } else if denied {
+                VStack(spacing: 10) {
+                    Text("Allow photo access to browse your library here.").foregroundStyle(.white).multilineTextAlignment(.center)
+                    Button("Open Settings") { if let u = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(u) } }.buttonStyle(.borderedProminent)
+                }.padding()
+            } else {
+                ProgressView().tint(.white)
+            }
+        }
+        .task {
+            let st = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+            guard st == .authorized || st == .limited else { denied = true; return }
+            let o = PHFetchOptions()
+            o.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+            assets = PHAsset.fetchAssets(with: .image, options: o)
+        }
+    }
+
+    private func pick(_ a: PHAsset) {
+        loading = true
+        let o = PHImageRequestOptions()
+        o.isNetworkAccessAllowed = true
+        o.version = .current
+        PHImageManager.default().requestImageDataAndOrientation(for: a, options: o) { data, _, _, _ in
+            DispatchQueue.main.async { loading = false; if let data { onPick(data) } }
+        }
+    }
+}
+
+private struct GridThumb: View {
+    let asset: PHAsset
+    let manager: PHCachingImageManager
+    @State private var image: UIImage?
+    var body: some View {
+        GeometryReader { g in
+            Group {
+                if let image { Image(uiImage: image).resizable().scaledToFill() } else { Color(white: 0.12) }
+            }
+            .frame(width: g.size.width, height: g.size.height).clipped()
+        }
+        .onAppear {
+            let o = PHImageRequestOptions(); o.deliveryMode = .opportunistic; o.resizeMode = .fast; o.isNetworkAccessAllowed = true
+            manager.requestImage(for: asset, targetSize: CGSize(width: 300, height: 300), contentMode: .aspectFill, options: o) { img, _ in
+                if let img { DispatchQueue.main.async { image = img } }
+            }
+        }
+    }
 }

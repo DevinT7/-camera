@@ -24,6 +24,8 @@ struct ShotStats: Codable {
     var qrShares = 0
     var lutImported = false
     var unlocked: [String] = []
+    var rollsDeveloped: Int? = nil
+    var fullRolls: Int? = nil
 
     static let key = "shotStats.v1"
     static func load() -> ShotStats {

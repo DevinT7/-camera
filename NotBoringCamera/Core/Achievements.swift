@@ -27,12 +27,15 @@ enum Achievements {
         a("streak30", "Daily Ritual", "Shoot 30 days in a row.", "sparkles", "FF2D55") { $0.bestStreak >= 30 },
         a("manual", "Hands On", "Take a photo in Manual mode.", "slider.horizontal.3", "8E8E93") { $0.usedManual },
         a("superraw", "Raw Talent", "Shoot with SuperRAW.", "film.fill", "BF5AF2") { $0.usedSuperRaw },
-        a("stylist", "Stylist", "Shoot with every built-in Style.", "paintpalette.fill", "FF375F") { Set($0.stylesUsed).isSuperset(of: Styles.builtIn.map(\.id)) },
+        a("stylist", "Stylist", "Shoot with every built-in Style.", "paintpalette.fill", "FF375F") { Set($0.stylesUsed).isSuperset(of: Styles.all.map(\.id)) },
         a("zoom", "Long Reach", "Shoot at 8× zoom or more.", "scope", "0A84FF") { $0.maxZoom >= 8 },
         a("night", "Night Owl", "Shoot between midnight and 4am.", "moon.stars.fill", "64D2FF") { $0.nightShot },
         a("video", "Rolling", "Record your first video.", "video.fill", "FF453A") { $0.videos >= 1 },
         a("lab", "Lab Rat", "Save an edit from Photo Lab.", "wand.and.stars", "AC8E68") { $0.labSaves >= 1 },
         a("lut", "Bring Your Own", "Import a .CUBE LUT.", "square.and.arrow.down.fill", "30D158") { $0.lutImported },
+        a("streak14", "Fortnight", "Shoot 14 days in a row.", "flame.circle.fill", "FF6B35") { $0.bestStreak >= 14 },
+        a("lastframe", "Last Frame", "Shoot every frame on a film roll.", "film.stack.fill", "C8A165") { ($0.fullRolls ?? 0) >= 1 },
+        a("developed", "Fresh Prints", "Get a roll developed.", "photo.stack.fill", "E8B86D") { ($0.rollsDeveloped ?? 0) >= 1 },
         a("share", "Sharing Is Caring", "Share a colorway by QR code.", "qrcode", "FFB020") { $0.qrShares >= 1 },
     ]
 
@@ -62,6 +65,8 @@ final class StatsStore: ObservableObject {
     }
     func recordVideo() { mutate { s in s.videos += 1; Self.bumpDay(&s) } }
     func recordLabSave() { mutate { $0.labSaves += 1 } }
+    func recordFullRoll() { mutate { $0.fullRolls = ($0.fullRolls ?? 0) + 1 } }
+    func recordRollDeveloped() { mutate { $0.rollsDeveloped = ($0.rollsDeveloped ?? 0) + 1 } }
     func recordQRShare() { mutate { $0.qrShares += 1 } }
     func recordLUTImport() { mutate { $0.lutImported = true } }
 
