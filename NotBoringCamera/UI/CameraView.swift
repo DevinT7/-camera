@@ -173,7 +173,7 @@ struct CameraView: View {
                         .frame(width: sideways ? size.height : size.width, height: sideways ? size.width : size.height)
                         .rotationEffect(.degrees(model.deviceTurn))
                         .frame(width: size.width, height: size.height)
-                        .animation(.easeInOut(duration: 0.3), value: model.deviceTurn)
+                        .transaction { $0.animation = nil }   // snap, no spin, when the phone turns
                 } else { simulatorPlaceholder }
                 if settings.cameraDiagnostics && model.hasCamera {
                     TimelineView(.periodic(from: .now, by: 0.5)) { _ in Text(model.diagnostics + "\n" + model.rotationReport()) }
