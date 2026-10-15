@@ -158,7 +158,10 @@ struct CameraView: View {
             let size = CGSize(width: width, height: width / r)
             ZStack {
                 if model.hasCamera {
-                    PreviewView(model: model)
+                    Group {
+                        if settings.systemPreview { SystemPreviewView(session: model.session, position: model.position) }
+                        else { PreviewView(model: model) }
+                    }
                         .blur(radius: model.isSwitching ? 22 : 0)
                         .animation(.easeInOut(duration: 0.25), value: model.isSwitching)
                 } else { simulatorPlaceholder }
