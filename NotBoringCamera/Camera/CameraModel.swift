@@ -118,6 +118,7 @@ final class CameraModel: NSObject, ObservableObject {
 
     // MARK: Lifecycle
     func start() {
+        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized: configureIfNeeded()
         case .notDetermined:
@@ -174,12 +175,12 @@ final class CameraModel: NSObject, ObservableObject {
         }
         if photoOutput.isAppleProRAWSupported { photoOutput.isAppleProRAWEnabled = true }
         if let dims = dev.activeFormat.supportedMaxPhotoDimensions.last { photoOutput.maxPhotoDimensions = dims }
+        rotationCoordinator = AVCaptureDevice.RotationCoordinator(device: dev, previewLayer: nil)
         session.commitConfiguration()
         applyOrientation(for: pos)
         videoQueue.asyncAfter(deadline: .now() + 0.25) { self.previewGateOpen = true }
 
         device = dev
-        rotationCoordinator = AVCaptureDevice.RotationCoordinator(device: dev, previewLayer: nil)
         installCameraControls(dev)
         // Continuous zoom range, expressed relative to the main (1x) lens.
         var base: CGFloat = 1
@@ -218,10 +219,29 @@ final class CameraModel: NSObject, ObservableObject {
     /// so values set before the commit land on the old (discarded) connections and the front camera comes up sideways.
     private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
 
+    /// Set by the view: when the system preview layer is on screen we skip building our own preview frames.
+    var nativePreviewActive = false
+
+    /// The rotation that makes this camera's output upright in the portrait-locked UI, whatever the sensor's mounting is
+    /// (the Center Stage selfie sensor is mounted differently from the others, so a fixed 90° is wrong for it).
+    /// The system coordinator follows gravity; undoing the device's current turn leaves the portrait angle.
+    func portraitAngle() -> CGFloat? {
+        guard let a = rotationCoordinator?.videoRotationAngleForHorizonLevelPreview else { return nil }
+        let turn: CGFloat
+        switch UIDevice.current.orientation {
+        case .landscapeLeft: turn = 90
+        case .portraitUpsideDown: turn = 180
+        case .landscapeRight: turn = 270
+        default: turn = 0
+        }
+        return (a + turn).truncatingRemainder(dividingBy: 360)
+    }
+
     private func applyOrientation(for pos: AVCaptureDevice.Position) {
         for out in [videoOutput as AVCaptureOutput, photoOutput] {
             guard let c = out.connection(with: .video) else { continue }
-            if c.isVideoRotationAngleSupported(90) { c.videoRotationAngle = 90 }
+            let angle = portraitAngle() ?? 90
+            if c.isVideoRotationAngleSupported(angle) { c.videoRotationAngle = angle }
             if c.isVideoMirroringSupported {
                 c.automaticallyAdjustsVideoMirroring = false
                 c.isVideoMirrored = false   // frames stay raw; selfie mirroring is applied explicitly (preview / saved photo / video each follow their own setting)
@@ -583,7 +603,7 @@ extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAu
             if st.peaking { img = overlayPeaking(img) }
             if st.zebra { img = overlayZebra(img) }
         }
-        if let cg = ciContext.createCGImage(img, from: img.extent) { frameSink?(cg) }
+        if !nativePreviewActive, let cg = ciContext.createCGImage(img, from: img.extent) { frameSink?(cg) }
     }
 
     private func gray(_ img: CIImage) -> CIImage {

@@ -23,13 +23,14 @@ struct PreviewView: UIViewRepresentable {
 struct SystemPreviewView: UIViewRepresentable {
     let session: AVCaptureSession
     let position: AVCaptureDevice.Position
+    let angle: () -> CGFloat?
 
     final class V: UIView {
         override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
         var preview: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
-        func upright() {
+        func upright(_ angle: CGFloat) {
             guard let c = preview.connection else { return }
-            if c.isVideoRotationAngleSupported(90) { c.videoRotationAngle = 90 }
+            if c.isVideoRotationAngleSupported(angle) { c.videoRotationAngle = angle }
         }
     }
 
@@ -42,7 +43,8 @@ struct SystemPreviewView: UIViewRepresentable {
     }
 
     func updateUIView(_ v: V, context: Context) {
-        v.upright()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { v.upright() }   // the connection is rebuilt after a flip
+        let a = angle() ?? 90
+        v.upright(a)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { v.upright(angle() ?? a) }   // the connection is rebuilt after a flip
     }
 }

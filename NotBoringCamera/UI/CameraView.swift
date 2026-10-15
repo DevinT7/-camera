@@ -20,6 +20,8 @@ struct CameraView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     private var cw: Colorway { settings.colorway }
+    /// With no live Style or overlay the system's own preview layer is used, exactly what the iPhone Camera app shows.
+    private var useNativePreview: Bool { settings.systemPreview && model.style.id == "standard" && !settings.zebra && !settings.focusPeaking }
 
     var body: some View {
         ZStack {
@@ -40,6 +42,7 @@ struct CameraView: View {
         .onAppear { model.start(); RollStore.shared.developDue(); UIApplication.shared.isIdleTimerDisabled = settings.keepAwake }
         .onChange(of: settings.keepAwake) { _, v in UIApplication.shared.isIdleTimerDisabled = v }
         .onChange(of: scenePhase) { _, p in if p == .active { model.start(); RollStore.shared.developDue() } else { model.stop() } }
+        .onChange(of: useNativePreview, initial: true) { _, v in model.nativePreviewActive = v }
         .onChange(of: settings.zebra) { _, _ in model.pushRenderState() }
         .onChange(of: settings.focusPeaking) { _, _ in model.pushRenderState() }
         .onChange(of: settings.histogram) { _, _ in model.pushRenderState() }
@@ -159,7 +162,7 @@ struct CameraView: View {
             ZStack {
                 if model.hasCamera {
                     Group {
-                        if settings.systemPreview { SystemPreviewView(session: model.session, position: model.position) }
+                        if useNativePreview { SystemPreviewView(session: model.session, position: model.position, angle: { model.portraitAngle() }) }
                         else { PreviewView(model: model) }
                     }
                         .blur(radius: model.isSwitching ? 22 : 0)

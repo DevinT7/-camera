@@ -88,7 +88,7 @@ struct SettingsView: View {
                     Picker("Grid", selection: $s.grid) { ForEach(GridStyle.allCases) { Text($0.rawValue).tag($0) } }
                     Toggle("Histogram", isOn: $s.histogram)
                     Toggle("Camera diagnostics overlay", isOn: $s.cameraDiagnostics)
-                    Toggle("System preview (raw, no live Style)", isOn: $s.systemPreview)
+                    Toggle("Native camera preview when no Style is on", isOn: $s.systemPreview)
                     Toggle("Zebra stripes", isOn: $s.zebra)
                     Toggle("Focus peaking", isOn: $s.focusPeaking)
                     Toggle("Remember Style, Lens, Flash, Mode & Exposure", isOn: $s.rememberSettings)
