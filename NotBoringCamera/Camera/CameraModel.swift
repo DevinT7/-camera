@@ -42,6 +42,7 @@ final class CameraModel: NSObject, ObservableObject {
     /// Front-camera flash lights the screen, like the system Camera's Retina Flash.
     @Published var screenFlashing = false
     private var savedBrightness: CGFloat = 0.5
+    private var captureWasFront = false
     @Published var isRecording = false
     @Published var recordSeconds = 0
 
@@ -409,6 +410,7 @@ final class CameraModel: NSObject, ObservableObject {
         let flashMode = flash
         let hiRes = settings.hiRes
         let dims = photoOutput.maxPhotoDimensions
+        captureWasFront = position == .front
         var lead = 0.0
         if position == .front && flash != .off {
             lead = 0.3
@@ -463,6 +465,8 @@ final class CameraModel: NSObject, ObservableObject {
             image = f.outputImage
         }
         guard var img = image else { DispatchQueue.main.async { self.capturing = false }; return }
+        // The live preview is always mirrored; the saved selfie is mirrored too only when the setting is on (like iOS's Mirror Front Camera).
+        if captureWasFront && s.mirrorSelfies { img = img.oriented(.upMirrored) }
         img = Styles.apply(style, to: img)
         if superRaw { img = Styles.addGrain(max(style.grain, 0.12), to: img) } else if style.grain > 0 { img = Styles.addGrain(style.grain * 0.6, to: img) }
         img = crop(img, to: s.aspect.ratio)
