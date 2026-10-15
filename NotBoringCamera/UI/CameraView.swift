@@ -46,6 +46,7 @@ struct CameraView: View {
         .sheet(isPresented: $showSettings) { SettingsView().environmentObject(settings).environmentObject(model) }
         .sheet(isPresented: $showAchievements) { AchievementsView() }
         .overlay(alignment: .top) { unlockToast; developedToast }
+        .overlay { if model.screenFlashing { Color(red: 1, green: 0.96, blue: 0.9).ignoresSafeArea().allowsHitTesting(false).transition(.opacity) } }
         .sheet(isPresented: $showLab) { PhotoLabView().environmentObject(settings).environmentObject(model) }
     }
 

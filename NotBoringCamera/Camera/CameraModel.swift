@@ -39,6 +39,9 @@ final class CameraModel: NSObject, ObservableObject {
     @Published var manualFocusActive = false
     @Published var minFocusMM: Int = 0
     @Published var captureMode: CaptureMode = .photo
+    /// Front-camera flash lights the screen, like the system Camera's Retina Flash.
+    @Published var screenFlashing = false
+    private var savedBrightness: CGFloat = 0.5
     @Published var isRecording = false
     @Published var recordSeconds = 0
 
@@ -135,7 +138,7 @@ final class CameraModel: NSObject, ObservableObject {
     private func pickDevice(_ pos: AVCaptureDevice.Position) -> AVCaptureDevice? {
         let types: [AVCaptureDevice.DeviceType] = pos == .back
             ? [.builtInTripleCamera, .builtInDualWideCamera, .builtInDualCamera, .builtInWideAngleCamera]
-            : [.builtInTrueDepthCamera, .builtInWideAngleCamera]
+            : [.builtInUltraWideCamera, .builtInTrueDepthCamera, .builtInWideAngleCamera]   // front ultra-wide = Center Stage selfie camera (iPhone 17 family), what the system Camera uses
         return AVCaptureDevice.DiscoverySession(deviceTypes: types, mediaType: .video, position: pos).devices.first
     }
 
@@ -251,7 +254,7 @@ final class CameraModel: NSObject, ObservableObject {
     }
 
     var quickZoomStops: [CGFloat] {
-        [0.5, 1, 2, 4, 8].filter { $0 >= minZoom - 0.001 && $0 <= maxZoom + 0.001 }
+        (position == .front ? [1, 1.5, 2] : [0.5, 1, 2, 4, 8]).filter { $0 >= minZoom - 0.001 && $0 <= maxZoom + 0.001 }
     }
 
     func tapFocus(at p: CGPoint, in size: CGSize) {
@@ -398,7 +401,14 @@ final class CameraModel: NSObject, ObservableObject {
         let flashMode = flash
         let hiRes = settings.hiRes
         let dims = photoOutput.maxPhotoDimensions
-        sessionQueue.async {
+        var lead = 0.0
+        if position == .front && flash != .off {
+            lead = 0.3
+            savedBrightness = UIScreen.main.brightness
+            screenFlashing = true
+            UIScreen.main.brightness = 1
+        }
+        sessionQueue.asyncAfter(deadline: .now() + lead) {
             self.pendingRaw = nil; self.pendingProcessed = nil
             // The UI is portrait-locked but the saved photo should be upright however the phone is held.
             if let c = self.photoOutput.connection(with: .video), let angle = self.rotationCoordinator?.videoRotationAngleForHorizonLevelCapture, c.isVideoRotationAngleSupported(angle) {
@@ -424,6 +434,9 @@ final class CameraModel: NSObject, ObservableObject {
     }
 
     private func finish(raw: Data?, processed: Data?, superRaw: Bool) {
+        DispatchQueue.main.async {
+            if self.screenFlashing { self.screenFlashing = false; UIScreen.main.brightness = self.savedBrightness }
+        }
         let s = settings
         var style = self.style
         switch s.dateStamp { case .on: style.fx.stamp = "date"; case .off: style.fx.stamp = nil; case .style: break }
