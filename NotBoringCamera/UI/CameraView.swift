@@ -189,7 +189,13 @@ struct CameraView: View {
                                     .frame(width: 44, height: 44).background(.black.opacity(0.4), in: Circle())
                             }.accessibilityLabel("Flip camera")
                         }.padding(.horizontal, 12)
-                    }.padding(.bottom, 10)
+                    }
+                    .padding(.bottom, 10)
+                    // Step aside while the Style picker is up; slide back in when it goes away.
+                    .opacity(styleToast ? 0 : 1)
+                    .offset(y: styleToast ? 14 : 0)
+                    .allowsHitTesting(!styleToast)
+                    .animation(.easeInOut(duration: 0.25), value: styleToast)
                 }
                 if model.isRecording {
                     Text(String(format: "● %02d:%02d", model.recordSeconds / 60, model.recordSeconds % 60))
