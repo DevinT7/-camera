@@ -226,7 +226,8 @@ final class CameraModel: NSObject, ObservableObject {
     /// (the Center Stage selfie sensor is mounted differently from the others, so a fixed 90° is wrong for it).
     /// The system coordinator follows gravity; undoing the device's current turn leaves the portrait angle.
     func portraitAngle() -> CGFloat? {
-        guard let a = rotationCoordinator?.videoRotationAngleForHorizonLevelPreview else { return nil }
+        // The coordinator has no preview layer attached, so only its capture angle is meaningful (its preview angle isn't).
+        guard let a = rotationCoordinator?.videoRotationAngleForHorizonLevelCapture else { return nil }
         let turn: CGFloat
         switch UIDevice.current.orientation {
         case .landscapeLeft: turn = 90
