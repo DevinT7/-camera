@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreMotion
 import CoreImage
 import Photos
 import UIKit
@@ -117,18 +118,7 @@ final class CameraModel: NSObject, ObservableObject {
 
     // MARK: Lifecycle
     func start() {
-        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
-        if orientationObserver == nil {
-            orientationObserver = NotificationCenter.default.addObserver(forName: UIDevice.orientationDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
-                switch UIDevice.current.orientation {
-                case .portrait: self?.deviceTurn = 0
-                case .landscapeLeft: self?.deviceTurn = 90          // phone turned counter-clockwise: turn the picture clockwise
-                case .landscapeRight: self?.deviceTurn = -90
-                case .portraitUpsideDown: self?.deviceTurn = 180
-                default: break                                      // flat / unknown: keep the last one
-                }
-            }
-        }
+        startMotion()
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized: configureIfNeeded()
         case .notDetermined:
@@ -233,7 +223,7 @@ final class CameraModel: NSObject, ObservableObject {
 
     /// Set by the view: when the system preview layer is on screen we skip building our own preview frames.
     var nativePreviewActive = false
-    private var orientationObserver: NSObjectProtocol?
+    private let motion = CMMotionManager()
 
     /// Degrees to turn the preview box (clockwise) so the scene reads upright to the user while the phone is held sideways.
     /// The camera output is always world-upright (the coordinator's horizon-level angle), like the system Camera.
@@ -251,10 +241,25 @@ final class CameraModel: NSObject, ObservableObject {
         let layerAngle = f(systemPreviewLayer?.connection?.videoRotationAngle)
         let out = videoOutput.connection(with: .video)
         let mirror = out.map { $0.isVideoMirrored ? "Y" : "N" } ?? "-"
-        let l1 = "orient \(names[o.rawValue] ?? "?")  turn \(Int(deviceTurn))"
+        let acc = motion.accelerometerData?.acceleration
+        let l1 = "orient \(names[o.rawValue] ?? "?")  turn \(Int(deviceTurn))  accel x \(String(format: "%.2f", acc?.x ?? 0)) y \(String(format: "%.2f", acc?.y ?? 0))"
         let l2 = "coord capture \(f(coord?.videoRotationAngleForHorizonLevelCapture))  preview \(f(coord?.videoRotationAngleForHorizonLevelPreview))"
         let l3 = "layer \(layerAngle)  output \(f(out?.videoRotationAngle))  mirrored \(mirror)  native \(nativePreviewActive ? "Y" : "N")"
         return [l1, l2, l3].joined(separator: "\n")
+    }
+
+    /// Which way the phone is held, from gravity. UIDevice.orientation isn't reliable here: with the interface locked to
+    /// portrait it stays "portrait" while the phone turns, so the viewfinder never rotated.
+    private func startMotion() {
+        guard motion.isAccelerometerAvailable, !motion.isAccelerometerActive else { return }
+        motion.accelerometerUpdateInterval = 0.1
+        motion.startAccelerometerUpdates(to: .main) { [weak self] data, _ in
+            guard let self, let a = data?.acceleration else { return }
+            var turn = self.deviceTurn
+            if abs(a.x) > 0.65, abs(a.x) > abs(a.y) { turn = a.x < 0 ? 90 : -90 }   // phone turned counter-clockwise: turn the picture clockwise
+            else if abs(a.y) > 0.65, abs(a.y) > abs(a.x) { turn = a.y < 0 ? 0 : 180 }
+            if turn != self.deviceTurn { self.deviceTurn = turn }
+        }
     }
 
     /// Horizon-level rotation from the system coordinator (it accounts for each sensor's mounting and for gravity).
