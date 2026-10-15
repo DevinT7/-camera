@@ -161,12 +161,19 @@ struct CameraView: View {
             let size = CGSize(width: width, height: width / r)
             ZStack {
                 if model.hasCamera {
+                    let sideways = abs(model.deviceTurn) == 90
                     Group {
-                        if useNativePreview { SystemPreviewView(session: model.session, position: model.position, angle: { model.portraitAngle(for: model.position) }) }
+                        if useNativePreview { SystemPreviewView(session: model.session, position: model.position, angle: model.liveAngle) }
                         else { PreviewView(model: model) }
                     }
                         .blur(radius: model.isSwitching ? 22 : 0)
                         .animation(.easeInOut(duration: 0.25), value: model.isSwitching)
+                        // Held sideways: draw the (world-upright, landscape) picture in a landscape-shaped frame and turn it,
+                        // so the viewfinder reads as a wide landscape box, like the system Camera.
+                        .frame(width: sideways ? size.height : size.width, height: sideways ? size.width : size.height)
+                        .rotationEffect(.degrees(model.deviceTurn))
+                        .frame(width: size.width, height: size.height)
+                        .animation(.easeInOut(duration: 0.3), value: model.deviceTurn)
                 } else { simulatorPlaceholder }
                 if settings.cameraDiagnostics && model.hasCamera {
                     Text(model.diagnostics).font(.system(size: 9, weight: .medium, design: .monospaced)).foregroundStyle(.green)

@@ -23,7 +23,7 @@ struct PreviewView: UIViewRepresentable {
 struct SystemPreviewView: UIViewRepresentable {
     let session: AVCaptureSession
     let position: AVCaptureDevice.Position
-    let angle: () -> CGFloat?
+    let angle: CGFloat
 
     final class V: UIView {
         override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
@@ -43,8 +43,7 @@ struct SystemPreviewView: UIViewRepresentable {
     }
 
     func updateUIView(_ v: V, context: Context) {
-        let a = angle() ?? 90
-        v.upright(a)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { v.upright(angle() ?? a) }   // the connection is rebuilt after a flip
+        v.upright(angle)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { v.upright(angle) }   // the connection is rebuilt after a flip
     }
 }

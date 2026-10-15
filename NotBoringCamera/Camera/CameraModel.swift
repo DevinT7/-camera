@@ -46,7 +46,6 @@ final class CameraModel: NSObject, ObservableObject {
     @Published var diagnostics = ""
     private var previewGateOpen = true        // read on videoQueue, written on sessionQueue
     private var pendingFirstFrame = false
-    private var landscapeFrames = 0
     private var savedBrightness: CGFloat = 0.5
     private var captureWasFront = false
     @Published var isRecording = false
@@ -120,9 +119,14 @@ final class CameraModel: NSObject, ObservableObject {
     func start() {
         UIDevice.current.beginGeneratingDeviceOrientationNotifications()
         if orientationObserver == nil {
-            orientationObserver = NotificationCenter.default.addObserver(forName: UIDevice.orientationDidChangeNotification, object: nil, queue: nil) { [weak self] _ in
-                guard let self, UIDevice.current.orientation == .portrait else { return }
-                self.sessionQueue.async { if let p = self.device?.position { self.applyOrientation(for: p) } }
+            orientationObserver = NotificationCenter.default.addObserver(forName: UIDevice.orientationDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+                switch UIDevice.current.orientation {
+                case .portrait: self?.deviceTurn = 0
+                case .landscapeLeft: self?.deviceTurn = 90          // phone turned counter-clockwise: turn the picture clockwise
+                case .landscapeRight: self?.deviceTurn = -90
+                case .portraitUpsideDown: self?.deviceTurn = 180
+                default: break                                      // flat / unknown: keep the last one
+                }
             }
         }
         switch AVCaptureDevice.authorizationStatus(for: .video) {
@@ -163,7 +167,7 @@ final class CameraModel: NSObject, ObservableObject {
         }
         // Drop frames while the connections are rebuilt: for a moment they arrive in the sensor's native orientation
         // (that was the upside-down flash after flipping). The preview holds/blurs until they're upright.
-        previewGateOpen = false; pendingFirstFrame = true; landscapeFrames = 0
+        previewGateOpen = false; pendingFirstFrame = true
         DispatchQueue.main.async { self.isSwitching = true }
         session.beginConfiguration()
         session.sessionPreset = .photo
@@ -181,7 +185,9 @@ final class CameraModel: NSObject, ObservableObject {
         }
         if photoOutput.isAppleProRAWSupported { photoOutput.isAppleProRAWEnabled = true }
         if let dims = dev.activeFormat.supportedMaxPhotoDimensions.last { photoOutput.maxPhotoDimensions = dims }
-        rotationCoordinator = AVCaptureDevice.RotationCoordinator(device: dev, previewLayer: nil)
+        let coordinator = AVCaptureDevice.RotationCoordinator(device: dev, previewLayer: nil)
+        rotationCoordinator = coordinator
+        watchAngle(coordinator)
         session.commitConfiguration()
         applyOrientation(for: pos)
         videoQueue.asyncAfter(deadline: .now() + 0.25) { self.previewGateOpen = true }
@@ -229,30 +235,30 @@ final class CameraModel: NSObject, ObservableObject {
     var nativePreviewActive = false
     private var orientationObserver: NSObjectProtocol?
 
-    /// The rotation that makes this camera's output upright in the portrait-locked UI, whatever the sensor's mounting is
-    /// (the Center Stage selfie sensor is mounted differently from the others, so a fixed 90° is wrong for it).
-    /// Learned from the system coordinator whenever the phone is held upright, then held constant so the preview stays
-    /// glued to the screen (a window onto the scene) while the phone is turned; photos still follow the real orientation.
-    private var portraitAngles: [AVCaptureDevice.Position: CGFloat] = [:]
-    private let angleLock = NSLock()   // read from the main thread (preview layer) and the session queue
+    /// Degrees to turn the preview box (clockwise) so the scene reads upright to the user while the phone is held sideways.
+    /// The camera output is always world-upright (the coordinator's horizon-level angle), like the system Camera.
+    @Published var deviceTurn: Double = 0
+    @Published var liveAngle: CGFloat = 90
+    private var angleObservation: NSKeyValueObservation?
 
-    private func calibratePortraitAngle(for pos: AVCaptureDevice.Position) {
-        // The coordinator has no preview layer attached, so only its capture angle is meaningful.
-        guard UIDevice.current.orientation == .portrait, let a = rotationCoordinator?.videoRotationAngleForHorizonLevelCapture else { return }
-        angleLock.lock(); portraitAngles[pos] = a; angleLock.unlock()
-    }
+    /// Horizon-level rotation from the system coordinator (it accounts for each sensor's mounting and for gravity).
+    /// No preview layer is attached to the coordinator, so the capture angle is the meaningful one.
+    func currentAngle() -> CGFloat { rotationCoordinator?.videoRotationAngleForHorizonLevelCapture ?? 90 }
 
-    func portraitAngle(for pos: AVCaptureDevice.Position) -> CGFloat {
-        calibratePortraitAngle(for: pos)
-        angleLock.lock(); defer { angleLock.unlock() }
-        if let known = portraitAngles[pos] { return known }
-        return 90   // until the phone has been seen upright once
+    private func watchAngle(_ coordinator: AVCaptureDevice.RotationCoordinator) {
+        angleObservation = coordinator.observe(\.videoRotationAngleForHorizonLevelCapture, options: [.new]) { [weak self] _, change in
+            guard let self, let a = change.newValue else { return }
+            self.sessionQueue.async {
+                if let c = self.videoOutput.connection(with: .video), c.isVideoRotationAngleSupported(a) { c.videoRotationAngle = a }
+            }
+            DispatchQueue.main.async { self.liveAngle = a }
+        }
     }
 
     private func applyOrientation(for pos: AVCaptureDevice.Position) {
         for out in [videoOutput as AVCaptureOutput, photoOutput] {
             guard let c = out.connection(with: .video) else { continue }
-            let angle = portraitAngle(for: pos)
+            let angle = currentAngle()
             if c.isVideoRotationAngleSupported(angle) { c.videoRotationAngle = angle }
             if c.isVideoMirroringSupported {
                 c.automaticallyAdjustsVideoMirroring = false
@@ -590,14 +596,7 @@ extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAu
         guard previewGateOpen, let pb = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         let st = renderState
         var img = CIImage(cvPixelBuffer: pb)
-        // The UI is portrait-only. If the connection rotation didn't take (the front camera after a flip), the buffer arrives
-        // landscape; turn it upright here, mirroring the selfie like the system camera does.
         let landscape = CVPixelBufferGetWidth(pb) > CVPixelBufferGetHeight(pb)
-        if landscape {
-            landscapeFrames += 1
-            if landscapeFrames < 12 { return }   // transient; only fall back if the rotation really didn't take
-            img = img.oriented(device?.position == .front ? .left : .right)
-        } else { landscapeFrames = 0 }
         if pendingFirstFrame {
             pendingFirstFrame = false
             let d = device
