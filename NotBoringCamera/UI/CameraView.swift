@@ -163,7 +163,7 @@ struct CameraView: View {
                 if model.hasCamera {
                     let sideways = abs(model.deviceTurn) == 90
                     Group {
-                        if useNativePreview { SystemPreviewView(session: model.session, position: model.position, angle: model.liveAngle) }
+                        if useNativePreview { SystemPreviewView(session: model.session, position: model.position, angle: model.liveAngle, model: model) }
                         else { PreviewView(model: model) }
                     }
                         .blur(radius: model.isSwitching ? 22 : 0)
@@ -176,7 +176,8 @@ struct CameraView: View {
                         .animation(.easeInOut(duration: 0.3), value: model.deviceTurn)
                 } else { simulatorPlaceholder }
                 if settings.cameraDiagnostics && model.hasCamera {
-                    Text(model.diagnostics).font(.system(size: 9, weight: .medium, design: .monospaced)).foregroundStyle(.green)
+                    TimelineView(.periodic(from: .now, by: 0.5)) { _ in Text(model.diagnostics + "\n" + model.rotationReport()) }
+                        .font(.system(size: 9, weight: .medium, design: .monospaced)).foregroundStyle(.green)
                         .padding(5).background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 6))
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).padding(8).allowsHitTesting(false)
                 }

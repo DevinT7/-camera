@@ -240,6 +240,22 @@ final class CameraModel: NSObject, ObservableObject {
     @Published var deviceTurn: Double = 0
     @Published var liveAngle: CGFloat = 90
     private var angleObservation: NSKeyValueObservation?
+    weak var systemPreviewLayer: AVCaptureVideoPreviewLayer?
+
+    /// Live rotation numbers for the diagnostics overlay.
+    func rotationReport() -> String {
+        let o = UIDevice.current.orientation
+        let names = [0: "unknown", 1: "portrait", 2: "upsideDown", 3: "landscapeLeft", 4: "landscapeRight", 5: "faceUp", 6: "faceDown"]
+        let coord = rotationCoordinator
+        func f(_ v: CGFloat?) -> String { v.map { String(format: "%.0f", $0) } ?? "-" }
+        let layerAngle = f(systemPreviewLayer?.connection?.videoRotationAngle)
+        let out = videoOutput.connection(with: .video)
+        let mirror = out.map { $0.isVideoMirrored ? "Y" : "N" } ?? "-"
+        let l1 = "orient \(names[o.rawValue] ?? "?")  turn \(Int(deviceTurn))"
+        let l2 = "coord capture \(f(coord?.videoRotationAngleForHorizonLevelCapture))  preview \(f(coord?.videoRotationAngleForHorizonLevelPreview))"
+        let l3 = "layer \(layerAngle)  output \(f(out?.videoRotationAngle))  mirrored \(mirror)  native \(nativePreviewActive ? "Y" : "N")"
+        return [l1, l2, l3].joined(separator: "\n")
+    }
 
     /// Horizon-level rotation from the system coordinator (it accounts for each sensor's mounting and for gravity).
     /// No preview layer is attached to the coordinator, so the capture angle is the meaningful one.

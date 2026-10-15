@@ -24,6 +24,7 @@ struct SystemPreviewView: UIViewRepresentable {
     let session: AVCaptureSession
     let position: AVCaptureDevice.Position
     let angle: CGFloat
+    var model: CameraModel?
 
     final class V: UIView {
         override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
@@ -38,6 +39,7 @@ struct SystemPreviewView: UIViewRepresentable {
         let v = V()
         v.backgroundColor = .black
         v.preview.session = session
+        model?.systemPreviewLayer = v.preview
         v.preview.videoGravity = .resizeAspectFill
         return v
     }
