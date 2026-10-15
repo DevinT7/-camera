@@ -41,6 +41,12 @@ final class CameraModel: NSObject, ObservableObject {
     @Published var captureMode: CaptureMode = .photo
     /// Front-camera flash lights the screen, like the system Camera's Retina Flash.
     @Published var screenFlashing = false
+    /// True from the moment a camera switch starts until the first correctly oriented frame arrives (the preview blurs meanwhile).
+    @Published var isSwitching = false
+    @Published var diagnostics = ""
+    private var previewGateOpen = true        // read on videoQueue, written on sessionQueue
+    private var pendingFirstFrame = false
+    private var landscapeFrames = 0
     private var savedBrightness: CGFloat = 0.5
     private var captureWasFront = false
     @Published var isRecording = false
@@ -148,6 +154,10 @@ final class CameraModel: NSObject, ObservableObject {
             DispatchQueue.main.async { self.hasCamera = false }
             return
         }
+        // Drop frames while the connections are rebuilt: for a moment they arrive in the sensor's native orientation
+        // (that was the upside-down flash after flipping). The preview holds/blurs until they're upright.
+        previewGateOpen = false; pendingFirstFrame = true; landscapeFrames = 0
+        DispatchQueue.main.async { self.isSwitching = true }
         session.beginConfiguration()
         session.sessionPreset = .photo
         session.inputs.forEach { session.removeInput($0) }
@@ -166,6 +176,7 @@ final class CameraModel: NSObject, ObservableObject {
         if let dims = dev.activeFormat.supportedMaxPhotoDimensions.last { photoOutput.maxPhotoDimensions = dims }
         session.commitConfiguration()
         applyOrientation(for: pos)
+        videoQueue.asyncAfter(deadline: .now() + 0.25) { self.previewGateOpen = true }
 
         device = dev
         rotationCoordinator = AVCaptureDevice.RotationCoordinator(device: dev, previewLayer: nil)
@@ -544,13 +555,22 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
 extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         if output === audioOutput { appendAudio(sampleBuffer); return }
-        guard let pb = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        guard previewGateOpen, let pb = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         let st = renderState
         var img = CIImage(cvPixelBuffer: pb)
         // The UI is portrait-only. If the connection rotation didn't take (the front camera after a flip), the buffer arrives
         // landscape; turn it upright here, mirroring the selfie like the system camera does.
-        if CVPixelBufferGetWidth(pb) > CVPixelBufferGetHeight(pb) {
+        let landscape = CVPixelBufferGetWidth(pb) > CVPixelBufferGetHeight(pb)
+        if landscape {
+            landscapeFrames += 1
+            if landscapeFrames < 12 { return }   // transient; only fall back if the rotation really didn't take
             img = img.oriented(device?.position == .front ? .leftMirrored : .right)
+        } else { landscapeFrames = 0 }
+        if pendingFirstFrame {
+            pendingFirstFrame = false
+            let d = device
+            let info = "\(d?.deviceType.rawValue.replacingOccurrences(of: "AVCaptureDeviceType", with: "") ?? "?")\nbuffer \(CVPixelBufferGetWidth(pb))×\(CVPixelBufferGetHeight(pb)) \(landscape ? "landscape" : "portrait")\nfov \(String(format: "%.1f", d?.activeFormat.videoFieldOfView ?? 0))° zoom \(String(format: "%.2f", d?.videoZoomFactor ?? 0)) base \(String(format: "%.2f", zoomBase))\nfmt \(d.map { "\(CMVideoFormatDescriptionGetDimensions($0.activeFormat.formatDescription).width)×\(CMVideoFormatDescriptionGetDimensions($0.activeFormat.formatDescription).height)" } ?? "?")"
+            DispatchQueue.main.async { self.isSwitching = false; self.diagnostics = info }
         }
         img = Styles.apply(st.style, to: img)
         if isRecording { appendVideo(img, at: CMSampleBufferGetPresentationTimeStamp(sampleBuffer)) }

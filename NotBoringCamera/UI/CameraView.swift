@@ -157,7 +157,16 @@ struct CameraView: View {
             let width = min(g.size.width, g.size.height * r)
             let size = CGSize(width: width, height: width / r)
             ZStack {
-                if model.hasCamera { PreviewView(model: model) } else { simulatorPlaceholder }
+                if model.hasCamera {
+                    PreviewView(model: model)
+                        .blur(radius: model.isSwitching ? 22 : 0)
+                        .animation(.easeInOut(duration: 0.25), value: model.isSwitching)
+                } else { simulatorPlaceholder }
+                if settings.cameraDiagnostics && model.hasCamera {
+                    Text(model.diagnostics).font(.system(size: 9, weight: .medium, design: .monospaced)).foregroundStyle(.green)
+                        .padding(5).background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 6))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).padding(8).allowsHitTesting(false)
+                }
                 GridOverlay(style: settings.grid)
                 if settings.histogram && model.isManual && model.hasCamera { HistogramView(bins: model.histogram).frame(width: 96, height: 44).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).padding(10) }
                 if let p = model.focusPoint { FocusRing(manual: model.manualFocusActive, minFocusMM: model.minFocusMM).position(p) }
