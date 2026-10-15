@@ -175,6 +175,14 @@ final class CameraModel: NSObject, ObservableObject {
            let first = dev.virtualDeviceSwitchOverVideoZoomFactors.first {
             base = CGFloat(truncating: first)
         }
+        if pos == .front, dev.deviceType == .builtInUltraWideCamera {
+            // The Center Stage selfie camera is ultra-wide. Open at a normal selfie framing (~24mm equivalent, like the system
+            // Camera) so "1×" isn't the full 95° view; the wider view stays available below 1×.
+            var nominal: CGFloat = 0
+            if #available(iOS 26.0, *) { nominal = CGFloat(dev.nominalFocalLengthIn35mmFilm) }
+            let focal = nominal > 0 ? nominal : 18 / tan(CGFloat(dev.activeFormat.videoFieldOfView) * .pi / 360)
+            base = min(max(24 / focal, 1), max(dev.maxAvailableVideoZoomFactor / 2, 1))
+        }
         zoomBase = base
         let lo = dev.minAvailableVideoZoomFactor / base
         let hi = min(dev.maxAvailableVideoZoomFactor / base, 25)
@@ -254,7 +262,7 @@ final class CameraModel: NSObject, ObservableObject {
     }
 
     var quickZoomStops: [CGFloat] {
-        (position == .front ? [1, 1.5, 2] : [0.5, 1, 2, 4, 8]).filter { $0 >= minZoom - 0.001 && $0 <= maxZoom + 0.001 }
+        (position == .front ? [0.5, 1, 1.5, 2] : [0.5, 1, 2, 4, 8]).filter { $0 >= minZoom - 0.001 && $0 <= maxZoom + 0.001 }
     }
 
     func tapFocus(at p: CGPoint, in size: CGSize) {
