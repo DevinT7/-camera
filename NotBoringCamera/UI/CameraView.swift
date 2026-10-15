@@ -112,34 +112,28 @@ struct CameraView: View {
             roundButton("gearshape.fill") { showSettings = true }
             roundButton("trophy.fill") { showAchievements = true }
             Spacer()
-            modeToggle
             Menu {
-                ForEach(CapturePipeline.allCases) { p in
-                    Button { settings.pipeline = p } label: { Label(p.rawValue, systemImage: settings.pipeline == p ? "checkmark" : "") }
-                }
-                Divider()
-                Picker("Mode", selection: Binding(get: { model.captureMode }, set: { model.setMode($0) })) {
-                    Label("Photo", systemImage: "camera.fill").tag(CaptureMode.photo)
-                    Label("Video", systemImage: "video.fill").tag(CaptureMode.video)
-                }
-                Picker("Aspect", selection: $settings.aspect) { ForEach(AspectOption.allCases) { Text($0.rawValue).tag($0) } }
+                Picker("Aspect ratio", selection: $settings.aspect) { ForEach(AspectOption.allCases) { Text($0.rawValue).tag($0) } }
             } label: {
-                Text(settings.aspect.rawValue).font(.system(size: 12, weight: .heavy, design: .rounded)).lineLimit(1).minimumScaleFactor(0.8)
-                    .foregroundStyle(cw.ink).frame(width: 40, height: 40)
+                Text(settings.aspect.rawValue).font(.system(size: 13, weight: .heavy, design: .rounded)).lineLimit(1).minimumScaleFactor(0.8)
+                    .foregroundStyle(cw.ink).frame(width: 52, height: 40)
                     .background(cw.panelColor, in: RoundedRectangle(cornerRadius: 10))
             }
-            Spacer()
-            Button { model.flip(); Feedback.toggle() } label: { icon("arrow.triangle.2.circlepath.camera.fill") }
-            Button { showLab = true; Feedback.toggle() } label: {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10).fill(cw.panelColor)
-                    if !settings.filmRoll, let img = model.lastImage { Image(uiImage: img).resizable().scaledToFill().clipShape(RoundedRectangle(cornerRadius: 10)) }
-                    else { Image(systemName: "wand.and.stars").foregroundStyle(cw.ink) }
-                }
-                .frame(width: 40, height: 40)
+            .accessibilityLabel("Aspect ratio")
+            Button { cycleFlash() } label: {
+                Image(systemName: model.flash == .off ? "bolt.slash.fill" : (model.flash == .auto ? "bolt.badge.automatic.fill" : "bolt.fill"))
+                    .font(.system(size: 16, weight: .bold)).foregroundStyle(model.flash == .off ? cw.ink.opacity(0.6) : cw.dialColor)
+                    .frame(width: 40, height: 40).background(cw.panelColor, in: RoundedRectangle(cornerRadius: 10))
             }
+            .accessibilityLabel("Flash \(model.flash.rawValue)")
         }
         .padding(.top, 6)
+    }
+
+    private func cycleFlash() {
+        let all = FlashSetting.allCases
+        model.flash = all[(all.firstIndex(of: model.flash)! + 1) % all.count]
+        settings.lastFlash = model.flash; Feedback.toggle()
     }
 
     private var formatLabel: String {
@@ -167,7 +161,20 @@ struct CameraView: View {
                 if settings.histogram && model.isManual && model.hasCamera { HistogramView(bins: model.histogram).frame(width: 96, height: 44).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).padding(10) }
                 if let p = model.focusPoint { FocusRing(manual: model.manualFocusActive, minFocusMM: model.minFocusMM).position(p) }
                 if let img = model.reviewImage { Image(uiImage: img).resizable().scaledToFill().transition(.opacity) }
-                VStack { Spacer(); zoomBar.padding(.bottom, 10) }
+                VStack {
+                    Spacer()
+                    ZStack {
+                        zoomBar
+                        HStack {
+                            labButton
+                            Spacer()
+                            Button { model.flip(); Feedback.toggle() } label: {
+                                Image(systemName: "arrow.triangle.2.circlepath.camera.fill").font(.system(size: 17, weight: .bold)).foregroundStyle(.white)
+                                    .frame(width: 44, height: 44).background(.black.opacity(0.4), in: Circle())
+                            }.accessibilityLabel("Flip camera")
+                        }.padding(.horizontal, 12)
+                    }.padding(.bottom, 10)
+                }
                 if model.isRecording {
                     Text(String(format: "● %02d:%02d", model.recordSeconds / 60, model.recordSeconds % 60))
                         .font(.system(size: 14, weight: .heavy, design: .rounded)).monospacedDigit().foregroundStyle(.white)
@@ -213,6 +220,17 @@ struct CameraView: View {
             Text(model.authorized ? "NO CAMERA\n(run on a real iPhone)" : "CAMERA ACCESS NEEDED")
                 .font(.system(size: 13, weight: .heavy, design: .rounded)).multilineTextAlignment(.center).foregroundStyle(.white.opacity(0.8))
         }
+    }
+
+    /// Last photo (or a gallery icon); opens Photo Lab.
+    private var labButton: some View {
+        Button { showLab = true; Feedback.toggle() } label: {
+            ZStack {
+                Circle().fill(.black.opacity(0.4))
+                if !settings.filmRoll, let img = model.lastImage { Image(uiImage: img).resizable().scaledToFill().clipShape(Circle()).overlay(Circle().strokeBorder(.white.opacity(0.8), lineWidth: 1.5)) }
+                else { Image(systemName: "photo.on.rectangle").font(.system(size: 16, weight: .bold)).foregroundStyle(.white) }
+            }.frame(width: 44, height: 44)
+        }.accessibilityLabel("Photo Lab")
     }
 
     // MARK: Zoom: continuous. Presets are shortcuts, the ruler/pinch give every in-between value.
@@ -353,20 +371,10 @@ struct CameraView: View {
     // MARK: Switches
     private var switches: some View {
         HStack {
-            Button {
-                let all = FlashSetting.allCases
-                model.flash = all[(all.firstIndex(of: model.flash)! + 1) % all.count]
-                settings.lastFlash = model.flash; Feedback.toggle()
-            } label: {
-                VStack(spacing: 6) {
-                    ZStack {
-                        Capsule().fill(cw.panelColor).frame(width: 78, height: 42)
-                        Image(systemName: model.flash == .off ? "bolt.slash.fill" : (model.flash == .auto ? "bolt.badge.automatic.fill" : "bolt.fill"))
-                            .font(.system(size: 18, weight: .bold)).foregroundStyle(model.flash == .off ? cw.ink.opacity(0.6) : cw.dialColor)
-                    }
-                    Text("FLASH \(model.flash.rawValue.uppercased())").font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(cw.ink).tracking(1)
-                }
-            }.buttonStyle(.plain)
+            VStack(spacing: 6) {
+                modeToggle
+                Text(model.captureMode == .video ? "VIDEO" : "PHOTO").font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(cw.ink).tracking(1)
+            }
             Spacer()
             ChunkySwitch(top: "M", bottom: "A", isOn: $model.isManual, colorway: cw)
             Spacer()
