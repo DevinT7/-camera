@@ -44,6 +44,7 @@ final class AppSettings: ObservableObject {
     @AppStorage("haptics") var haptics = true
     @AppStorage("saveToAlbum") var saveToAlbum = true
     @AppStorage("mirrorSelfies") var mirrorSelfies = false   // iOS default: preview mirrored, saved photo not
+    @AppStorage("mirrorPreview") var mirrorPreview = true
     @AppStorage("cameraDiagnostics") var cameraDiagnostics = false
     @AppStorage("hdr") var hdr = false
     @AppStorage("hiRes") var hiRes = false

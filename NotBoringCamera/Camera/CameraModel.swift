@@ -224,7 +224,7 @@ final class CameraModel: NSObject, ObservableObject {
             if c.isVideoRotationAngleSupported(90) { c.videoRotationAngle = 90 }
             if c.isVideoMirroringSupported {
                 c.automaticallyAdjustsVideoMirroring = false
-                c.isVideoMirrored = pos == .front && out === videoOutput
+                c.isVideoMirrored = false   // frames stay raw; selfie mirroring is applied explicitly (preview / saved photo / video each follow their own setting)
             }
         }
     }
@@ -564,7 +564,7 @@ extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAu
         if landscape {
             landscapeFrames += 1
             if landscapeFrames < 12 { return }   // transient; only fall back if the rotation really didn't take
-            img = img.oriented(device?.position == .front ? .leftMirrored : .right)
+            img = img.oriented(device?.position == .front ? .left : .right)
         } else { landscapeFrames = 0 }
         if pendingFirstFrame {
             pendingFirstFrame = false
@@ -573,7 +573,10 @@ extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAu
             DispatchQueue.main.async { self.isSwitching = false; self.diagnostics = info }
         }
         img = Styles.apply(st.style, to: img)
-        if isRecording { appendVideo(img, at: CMSampleBufferGetPresentationTimeStamp(sampleBuffer)) }
+        let front = device?.position == .front
+        if isRecording { appendVideo(front && settings.mirrorSelfies ? img.oriented(.upMirrored) : img, at: CMSampleBufferGetPresentationTimeStamp(sampleBuffer)) }
+        // Live selfie preview: mirrored like a mirror (the system Camera's viewfinder), independent of what gets saved.
+        if front && settings.mirrorPreview { img = img.oriented(.upMirrored) }
         frameCount += 1
         if st.histogram, frameCount % 4 == 0 { computeHistogram(img) }
         if isManual || true {

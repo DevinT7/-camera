@@ -52,7 +52,8 @@ struct SettingsView: View {
                     Toggle("48MP max resolution", isOn: $s.hiRes)
                     Toggle("Save HEIC + DNG RAW", isOn: $s.rawPlusHeic)
                     Stepper("Photo Review: \(s.photoReviewSeconds == 0 ? "Off" : "\(s.photoReviewSeconds)s")", value: $s.photoReviewSeconds, in: 0...10)
-                    Toggle("Mirror front selfies", isOn: $s.mirrorSelfies)
+                    Toggle("Mirror selfie preview", isOn: $s.mirrorPreview)
+                    Toggle("Save selfies mirrored", isOn: $s.mirrorSelfies)
                     Toggle("Save to “!Camera” album", isOn: $s.saveToAlbum)
                 }
     }
