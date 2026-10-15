@@ -162,7 +162,7 @@ struct CameraView: View {
             ZStack {
                 if model.hasCamera {
                     Group {
-                        if useNativePreview { SystemPreviewView(session: model.session, position: model.position, angle: { model.portraitAngle() }) }
+                        if useNativePreview { SystemPreviewView(session: model.session, position: model.position, angle: { model.portraitAngle(for: model.position) }) }
                         else { PreviewView(model: model) }
                     }
                         .blur(radius: model.isSwitching ? 22 : 0)
