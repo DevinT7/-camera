@@ -166,8 +166,9 @@ struct CameraView: View {
                         if useNativePreview { SystemPreviewView(session: model.session, position: model.position, angle: model.liveAngle, model: model) }
                         else { PreviewView(model: model) }
                     }
-                        .blur(radius: model.isSwitching ? 22 : 0)
+                        .blur(radius: (model.isSwitching || model.isTurning) ? 18 : 0)
                         .animation(.easeInOut(duration: 0.25), value: model.isSwitching)
+                        .animation(.easeOut(duration: 0.15), value: model.isTurning)
                         // Held sideways: draw the (world-upright, landscape) picture in a landscape-shaped frame and turn it,
                         // so the viewfinder reads as a wide landscape box, like the system Camera.
                         .frame(width: sideways ? size.height : size.width, height: sideways ? size.width : size.height)

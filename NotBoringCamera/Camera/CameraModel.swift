@@ -44,6 +44,8 @@ final class CameraModel: NSObject, ObservableObject {
     @Published var screenFlashing = false
     /// True from the moment a camera switch starts until the first correctly oriented frame arrives (the preview blurs meanwhile).
     @Published var isSwitching = false
+    /// True while the phone is mid-turn and the picture/box are being brought into agreement (the viewfinder softens meanwhile).
+    @Published var isTurning = false
     @Published var diagnostics = ""
     private var previewGateOpen = true        // read on videoQueue, written on sessionQueue
     private var pendingFirstFrame = false
@@ -257,12 +259,18 @@ final class CameraModel: NSObject, ObservableObject {
         motion.accelerometerUpdateInterval = 0.05
         motion.startAccelerometerUpdates(to: .main) { [weak self] data, _ in
             guard let self, let a = data?.acceleration else { return }
+            guard abs(a.z) < 0.85 else { return }                                  // lying flat: keep the last one
             var t: Double?
-            if abs(a.x) > 0.65, abs(a.x) > abs(a.y) { t = a.x < 0 ? 90 : -90 }   // turned counter-clockwise: turn the picture clockwise
-            else if abs(a.y) > 0.65, abs(a.y) > abs(a.x) { t = a.y < 0 ? 0 : 180 }
-            guard let t else { return }                                           // flat: keep the last one
+            if abs(a.x) > abs(a.y) + 0.1 { t = a.x < 0 ? 90 : -90 }                // turned counter-clockwise: turn the picture clockwise
+            else if abs(a.y) > abs(a.x) + 0.1 { t = a.y < 0 ? 0 : 180 }
+            guard let t else { return }
             self.videoQueue.async {
-                if t != self.targetTurn { self.targetTurn = t; self.angleDirty = true; self.angleDirtyAt = Date() }
+                guard t != self.targetTurn else { return }
+                self.targetTurn = t; self.angleDirty = true; self.angleDirtyAt = Date()
+                DispatchQueue.main.async {
+                    self.isTurning = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { self.isTurning = false }   // safety
+                }
             }
         }
     }
@@ -270,6 +278,7 @@ final class CameraModel: NSObject, ObservableObject {
     // Read/written on videoQueue. A rotation change is committed (box turn + layer angle) only when the first frame in the new
     // orientation arrives, so the picture and the box change in the same instant instead of one trailing the other.
     private var targetTurn: Double = 0
+    private var committedTurn: Double = 0
     private var angleDirty = true
     private var angleDirtyAt = Date.distantPast
     private var lastBufferLandscape: Bool?
@@ -630,16 +639,25 @@ extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAu
         let st = renderState
         var img = CIImage(cvPixelBuffer: pb)
         let landscape = CVPixelBufferGetWidth(pb) > CVPixelBufferGetHeight(pb)
+        // Portrait <-> landscape: wait until the camera really delivers frames in the new shape, so the box never turns while
+        // the picture hasn't (or the other way round). Same-shape changes (0 <-> 180, 90 <-> -90) settle after a short hold.
+        func wantsLandscape(_ turn: Double) -> Bool { abs(turn) == 90 }
         if angleDirty {
-            let classChanged = lastBufferLandscape != nil && lastBufferLandscape != landscape
-            if classChanged || Date().timeIntervalSince(angleDirtyAt) > 0.15 {
+            let age = Date().timeIntervalSince(angleDirtyAt)
+            let sameShape = wantsLandscape(committedTurn) == wantsLandscape(targetTurn)
+            if (sameShape ? age > 0.15 : landscape == wantsLandscape(targetTurn)) || age > 0.6 {
                 angleDirty = false
-                let a = currentAngle()
-                let t = targetTurn
-                DispatchQueue.main.async { self.deviceTurn = t; self.liveAngle = a }
+                committedTurn = targetTurn
+                let a = currentAngle(), t = targetTurn
+                DispatchQueue.main.async {
+                    self.deviceTurn = t; self.liveAngle = a
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { self.isTurning = false }
+                }
             }
         }
         lastBufferLandscape = landscape
+        // Frames whose shape disagrees with the box's current turn belong to a turn in progress: don't show them.
+        if landscape != wantsLandscape(committedTurn) { return }
         if pendingFirstFrame {
             pendingFirstFrame = false
             let d = device
