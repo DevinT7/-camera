@@ -209,6 +209,8 @@ struct StylePickerOverlay: View {
     @Binding var index: Int
     let accent: Color
     var visible = true
+    var topInset: CGFloat = 0
+    var bottomInset: CGFloat = 0
     @State private var tickWidth: CGFloat = 1
 
     var body: some View {
@@ -230,7 +232,7 @@ struct StylePickerOverlay: View {
             strip
                 .offset(y: visible ? 0 : 60).opacity(visible ? 1 : 0)
         }
-        .padding(.top, 14).padding(.bottom, 44)
+        .padding(.top, 14 + topInset).padding(.bottom, 44 + bottomInset)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(LinearGradient(colors: [.black.opacity(0.35), .clear, .black.opacity(0.45)], startPoint: .top, endPoint: .bottom).opacity(visible ? 1 : 0))
         .animation(.spring(response: 0.25, dampingFraction: 0.8), value: index)

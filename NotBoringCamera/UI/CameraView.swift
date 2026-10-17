@@ -29,7 +29,7 @@ struct CameraView: View {
         UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first?.keyWindow?.safeAreaInsets ?? UIEdgeInsets(top: 59, left: 0, bottom: 34, right: 0)
     }
     /// Space the picture's own overlays (badges, histogram) keep clear of the top bar in full-screen mode.
-    private var vfTop: CGFloat { fullScreen ? safeInsets.top + topH + 6 : 0 }
+    private var vfTop: CGFloat { fullScreen ? safeInsets.top + 52 : 0 }
     /// With no live Style or overlay the system's own preview layer is used, exactly what the iPhone Camera app shows.
     private var useNativePreview: Bool { settings.systemPreview && model.style.id == "standard" && !settings.zebra && !settings.focusPeaking }
 
@@ -42,23 +42,34 @@ struct CameraView: View {
                 .padding(.bottom, fullScreen ? 0 : bottomH + 10)
                 .ignoresSafeArea(edges: fullScreen ? .all : [])
             VStack(spacing: 0) {
-                topBar
-                    .padding(.horizontal, 16).padding(.bottom, fullScreen ? 24 : 0)
-                    .background(alignment: .top) {
-                        if fullScreen { LinearGradient(colors: [.black.opacity(0.5), .clear], startPoint: .top, endPoint: .bottom).ignoresSafeArea(edges: .top) }
+                Group {
+                    if fullScreen {
+                        // Full screen is for looking: the only controls left are zoom and the shutter, plus a way out.
+                        HStack { Spacer(); fullScreenExit }.padding(.top, 6)
+                    } else {
+                        topBar
                     }
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { topH = $0 }
+                }
+                .padding(.horizontal, 16)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { if !fullScreen { topH = $0 } }
                 Spacer(minLength: 0)
-                VStack(spacing: 10) {
-                    if model.isManual { manualStrip.transition(.move(edge: .bottom).combined(with: .opacity)) }
-                    controls
-                    switches
+                Group {
+                    if fullScreen {
+                        fullScreenControls
+                    } else {
+                        VStack(spacing: 10) {
+                            if model.isManual { manualStrip.transition(.move(edge: .bottom).combined(with: .opacity)) }
+                            controls
+                            switches
+                        }
+                    }
                 }
-                .padding(.horizontal, 16).padding(.bottom, 8).padding(.top, fullScreen ? 28 : 0)
+                .padding(.horizontal, 16).padding(.bottom, 8).padding(.top, fullScreen ? 16 : 0)
+                .frame(maxWidth: .infinity)
                 .background(alignment: .bottom) {
-                    if fullScreen { LinearGradient(colors: [.clear, .black.opacity(0.62)], startPoint: .top, endPoint: .bottom).ignoresSafeArea(edges: .bottom) }
+                    if fullScreen { LinearGradient(colors: [.clear, .black.opacity(0.28)], startPoint: .top, endPoint: .bottom).ignoresSafeArea(edges: .bottom) }
                 }
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { bottomH = $0 }
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { if !fullScreen { bottomH = $0 } }
             }
         }
         .animation(.easeInOut(duration: 0.3), value: settings.fullScreenPreview)
@@ -135,6 +146,29 @@ struct CameraView: View {
         .padding(3).background(cw.panelColor, in: Capsule())
         .opacity(model.isRecording ? 0.4 : 1).allowsHitTesting(!model.isRecording)
         .animation(.easeInOut(duration: 0.2), value: model.captureMode)
+    }
+
+    private var fullScreenExit: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.3)) { settings.fullScreenPreview = false }
+            Feedback.toggle()
+        } label: {
+            Image(systemName: "arrow.down.right.and.arrow.up.left").font(.system(size: 16, weight: .bold)).foregroundStyle(.white)
+                .frame(width: 40, height: 40).background(.black.opacity(0.4), in: Circle())
+        }
+        .accessibilityLabel("Exit full screen")
+    }
+
+    /// Zoom stops and the shutter, nothing else. They step aside while the Style picker is up, like the normal layout's zoom row.
+    private var fullScreenControls: some View {
+        VStack(spacing: 18) {
+            zoomBar
+            ShutterButton(colorway: cw, recording: model.isRecording) { model.capture() }
+        }
+        .opacity(styleToast ? 0 : 1)
+        .offset(y: styleToast ? 14 : 0)
+        .allowsHitTesting(!styleToast)
+        .animation(.easeInOut(duration: 0.25), value: styleToast)
     }
 
     // MARK: Top bar
@@ -219,25 +253,27 @@ struct CameraView: View {
                 if settings.histogram && model.isManual && model.hasCamera { HistogramView(bins: model.histogram).frame(width: 96, height: 44).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).padding(10).padding(.top, vfTop) }
                 if let p = model.focusPoint { FocusRing(manual: model.manualFocusActive, minFocusMM: model.minFocusMM).position(p) }
                 if let img = model.reviewImage { Image(uiImage: img).resizable().scaledToFill().transition(.opacity) }
-                VStack {
-                    Spacer()
-                    ZStack {
-                        zoomBar
-                        HStack {
-                            labButton
-                            Spacer()
-                            Button { model.flip(); Feedback.toggle() } label: {
-                                Image(systemName: "arrow.triangle.2.circlepath.camera.fill").font(.system(size: 17, weight: .bold)).foregroundStyle(.white)
-                                    .frame(width: 44, height: 44).background(.black.opacity(0.4), in: Circle())
-                            }.accessibilityLabel("Flip camera")
-                        }.padding(.horizontal, 12)
+                if !fullScreen {
+                    VStack {
+                        Spacer()
+                        ZStack {
+                            zoomBar
+                            HStack {
+                                labButton
+                                Spacer()
+                                Button { model.flip(); Feedback.toggle() } label: {
+                                    Image(systemName: "arrow.triangle.2.circlepath.camera.fill").font(.system(size: 17, weight: .bold)).foregroundStyle(.white)
+                                        .frame(width: 44, height: 44).background(.black.opacity(0.4), in: Circle())
+                                }.accessibilityLabel("Flip camera")
+                            }.padding(.horizontal, 12)
+                        }
+                        .padding(.bottom, 10)
+                        // Step aside while the Style picker is up; slide back in when it goes away.
+                        .opacity(styleToast ? 0 : 1)
+                        .offset(y: styleToast ? 14 : 0)
+                        .allowsHitTesting(!styleToast)
+                        .animation(.easeInOut(duration: 0.25), value: styleToast)
                     }
-                    .padding(.bottom, fullScreen ? bottomH + safeInsets.bottom + 12 : 10)
-                    // Step aside while the Style picker is up; slide back in when it goes away.
-                    .opacity(styleToast ? 0 : 1)
-                    .offset(y: styleToast ? 14 : 0)
-                    .allowsHitTesting(!styleToast)
-                    .animation(.easeInOut(duration: 0.25), value: styleToast)
                 }
                 if model.isRecording {
                     Text(String(format: "● %02d:%02d", model.recordSeconds / 60, model.recordSeconds % 60))
@@ -245,8 +281,9 @@ struct CameraView: View {
                         .padding(.horizontal, 10).padding(.vertical, 5).background(Color.red, in: Capsule())
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top).padding(.top, 12 + vfTop)
                 }
-                if settings.filmRoll && model.captureMode == .photo { rollBadge.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing).padding(12).padding(.top, vfTop) }
-                StylePickerOverlay(styles: model.styles, index: $model.styleIndex, accent: cw.accentColor, visible: styleToast)
+                if settings.filmRoll && model.captureMode == .photo { rollBadge.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: fullScreen ? .topLeading : .topTrailing).padding(12).padding(.top, vfTop) }
+                StylePickerOverlay(styles: model.styles, index: $model.styleIndex, accent: cw.accentColor, visible: styleToast,
+                                   topInset: fullScreen ? safeInsets.top : 0, bottomInset: fullScreen ? safeInsets.bottom : 0)
             }
             .frame(width: size.width, height: size.height)
             .clipShape(RoundedRectangle(cornerRadius: fullScreen ? 0 : 26, style: .continuous))
