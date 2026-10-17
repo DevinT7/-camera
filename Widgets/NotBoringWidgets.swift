@@ -75,7 +75,7 @@ struct LaunchWidgetView: View {
         Group {
             switch family {
             case .accessoryCircular:
-                ZStack { AccessoryWidgetBackground(); Image(systemName: "camera.fill").font(.system(size: 22, weight: .bold)) }
+                ZStack { AccessoryWidgetBackground(); Image("BangLens").resizable().scaledToFit().padding(11).widgetAccentable() }
             case .accessoryInline:
                 Label("Open !Camera", systemImage: "camera.fill")
             case .accessoryRectangular:
@@ -104,7 +104,7 @@ struct LaunchWidget: Widget {
 struct OpenCameraControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: "com.devin.camera.notboring.open") {
-            ControlWidgetButton(action: OpenCameraIntent()) { Label("!Camera", systemImage: "camera.fill") }
+            ControlWidgetButton(action: OpenCameraIntent()) { Label("!Camera", image: "BangLens") }
         }
         .displayName("!Camera")
         .description("Open !Camera.")
@@ -114,7 +114,7 @@ struct OpenCameraControl: ControlWidget {
 struct CaptureCameraControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: "com.devin.camera.notboring.capture") {
-            ControlWidgetButton(action: LaunchCaptureIntent()) { Label("!Camera Capture", systemImage: "camera.aperture") }
+            ControlWidgetButton(action: LaunchCaptureIntent()) { Label("!Camera Capture", image: "BangLens") }
         }
         .displayName("!Camera Capture")
         .description("Quick capture from the Lock Screen or Camera Control.")
@@ -125,6 +125,9 @@ struct CaptureCameraControl: ControlWidget {
 struct NotBoringWidgetBundle: WidgetBundle {
     var body: some Widget {
         ActivityWidget()
+        FilmRollWidget()
+        LastPhotoWidget()
+        StreakWidget()
         LaunchWidget()
         OpenCameraControl()
         CaptureCameraControl()

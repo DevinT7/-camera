@@ -7,6 +7,26 @@ enum SharedStore {
     static var containerURL: URL? { FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupID) }
 }
 
+extension SharedStore {
+    /// Small JPEG of the latest photo, for the Last Photo widget.
+    static var lastPhotoURL: URL? { containerURL?.appendingPathComponent("last-photo.jpg") }
+}
+
+/// Film-roll progress, written by the app and read by the Film Roll widget.
+struct RollSummary: Codable {
+    var shot = 0
+    var size = 24
+    var pending = 0
+    var nextDevelop: Date?
+
+    static let key = "rollSummary.v1"
+    static func load() -> RollSummary {
+        guard let d = SharedStore.defaults.data(forKey: key), let s = try? JSONDecoder().decode(RollSummary.self, from: d) else { return RollSummary() }
+        return s
+    }
+    func save() { SharedStore.defaults.set(try? JSONEncoder().encode(self), forKey: Self.key) }
+}
+
 /// Shooting statistics shown by the activity widget and used by achievements.
 struct ShotStats: Codable {
     var total = 0

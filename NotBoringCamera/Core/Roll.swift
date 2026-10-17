@@ -50,6 +50,8 @@ final class RollStore: ObservableObject {
         rolls[i].lastShot = Date()
         if rolls[i].isFull { StatsStore.shared.recordFullRoll() }
         persist()
+        RollNotifications.requestIfNeeded()
+        RollNotifications.schedule(rollID: rolls[i].id, at: rolls[i].developAt ?? Date().addingTimeInterval(Self.developDelay), frames: rolls[i].files.count)
     }
 
     /// Ends the current roll early; it develops 24h after its last frame like any other.
@@ -75,6 +77,7 @@ final class RollStore: ObservableObject {
             group.notify(queue: .main) { [weak self] in
                 guard let self, !failed else { return }
                 urls.forEach { try? FileManager.default.removeItem(at: $0) }
+                RollNotifications.cancel(rollID: roll.id)
                 self.rolls.removeAll { $0.id == roll.id }
                 self.persist()
                 self.developedCount = (self.developedCount ?? 0) + blobs.count
@@ -84,5 +87,9 @@ final class RollStore: ObservableObject {
         }
     }
 
-    private func persist() { try? JSONEncoder().encode(rolls).write(to: Self.indexURL, options: .atomic) }
+    private func persist() {
+        try? JSONEncoder().encode(rolls).write(to: Self.indexURL, options: .atomic)
+        RollSummary(shot: framesShot, size: current?.size ?? AppSettings.shared.rollSize, pending: pendingFrames, nextDevelop: nextDevelop).save()
+        ActivityReload.reload()
+    }
 }

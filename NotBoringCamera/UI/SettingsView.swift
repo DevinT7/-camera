@@ -69,6 +69,7 @@ struct SettingsView: View {
     @ViewBuilder private var rollSection: some View {
         Section("Film Roll") {
             Toggle("Film roll mode", isOn: $s.filmRoll)
+                .onChange(of: s.filmRoll) { _, on in if on { RollNotifications.requestIfNeeded() } }
             Text("A fixed number of frames. No preview, no deleting. Shots are held back and “developed” into Photos 24 hours after the last frame.").font(.footnote).foregroundStyle(.secondary)
             if s.filmRoll {
                 Picker("Frames per roll", selection: $s.rollSize) { Text("24").tag(24); Text("36").tag(36) }.pickerStyle(.segmented)

@@ -576,6 +576,7 @@ final class CameraModel: NSObject, ObservableObject {
             }
             return
         }
+        writeLastPhoto(img)
         let thumb = ciContext.createCGImage(img.transformed(by: CGAffineTransform(scaleX: 0.25, y: 0.25)), from: img.transformed(by: CGAffineTransform(scaleX: 0.25, y: 0.25)).extent).map(UIImage.init(cgImage:))
         let rawToSave = s.rawPlusHeic ? raw : nil
         if let heic { save(heic: heic, dng: rawToSave) }
@@ -587,6 +588,17 @@ final class CameraModel: NSObject, ObservableObject {
             }
             self.capturing = false
             StatsStore.shared.recordPhoto(styleID: style.id, manual: self.isManual, superRaw: superRaw, zoom: Double(self.zoom))
+        }
+    }
+
+    /// A small JPEG of the latest photo for the Last Photo widget (skipped in film roll mode: those shots stay hidden).
+    private func writeLastPhoto(_ img: CIImage) {
+        guard let url = SharedStore.lastPhotoURL else { return }
+        let e = img.extent
+        let k = min(1, 800 / max(e.width, e.height))
+        let small = img.transformed(by: CGAffineTransform(scaleX: k, y: k))
+        if let data = ciContext.jpegRepresentation(of: small, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!, options: [:]) {
+            try? data.write(to: url, options: .atomic)
         }
     }
 
