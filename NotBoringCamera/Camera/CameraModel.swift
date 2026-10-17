@@ -560,7 +560,7 @@ final class CameraModel: NSObject, ObservableObject {
         if captureWasFront && s.mirrorSelfies { img = img.oriented(.upMirrored) }
         img = Styles.apply(style, to: img)
         if superRaw { img = Styles.addGrain(max(style.grain, 0.12), to: img) } else if style.grain > 0 { img = Styles.addGrain(style.grain * 0.6, to: img) }
-        img = crop(img, to: s.aspect.ratio)
+        img = crop(img, to: s.fullScreenPreview ? AppSettings.screenRatio : s.aspect.ratio)   // full-screen mode saves what the screen shows
         img = Styles.decorate(style.fx, img)
         let p3 = CGColorSpace(name: CGColorSpace.displayP3)!
         let heic: Data? = s.hdr

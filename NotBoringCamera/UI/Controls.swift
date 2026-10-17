@@ -96,6 +96,7 @@ struct ChunkySwitch: View {
     let bottom: String
     @Binding var isOn: Bool
     let colorway: Colorway
+    var labelColor: Color? = nil   // set when the switch sits on the picture (full-screen mode)
     @EnvironmentObject var tiltHolder: TiltBox
 
     var body: some View {
@@ -109,7 +110,7 @@ struct ChunkySwitch: View {
                     .shadow(color: .black.opacity(0.35), radius: 3, x: tiltHolder.tilt.x * 4, y: tiltHolder.tilt.y * 4 + 1)
             }
             .animation(.spring(response: 0.22, dampingFraction: 0.7), value: isOn)
-            Text(isOn ? top : bottom).font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(colorway.ink).tracking(1)
+            Text(isOn ? top : bottom).font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(labelColor ?? colorway.ink).tracking(1)
         }
         .contentShape(Rectangle())
         .onTapGesture { isOn.toggle(); Feedback.toggle() }

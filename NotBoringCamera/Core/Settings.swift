@@ -44,6 +44,7 @@ final class AppSettings: ObservableObject {
     @AppStorage("haptics") var haptics = true
     @AppStorage("saveToAlbum") var saveToAlbum = true
     @AppStorage("mirrorSelfies") var mirrorSelfies = false   // iOS default: preview mirrored, saved photo not
+    @Published var fullScreenPreview = false   // not remembered: the app always opens in the normal layout
     @AppStorage("mirrorPreview") var mirrorPreview = true
     @AppStorage("systemPreview") var systemPreview = true
     @AppStorage("cameraDiagnostics") var cameraDiagnostics = false
@@ -67,6 +68,9 @@ final class AppSettings: ObservableObject {
     @AppStorage("lastManual") var lastManual = false
     @AppStorage("lastEV") var lastEV = 0.0
     @AppStorage("onboarded") var onboarded = false
+
+    /// Portrait width / height of the screen: what a full-screen preview shows, and so what gets saved in full-screen mode.
+    static var screenRatio: CGFloat { let b = UIScreen.main.bounds; return min(b.width, b.height) / max(b.width, b.height) }
 
     var customColorways: [Colorway] {
         get { (try? JSONDecoder().decode([Colorway].self, from: customColorwaysData)) ?? [] }

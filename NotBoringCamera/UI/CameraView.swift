@@ -20,23 +20,50 @@ struct CameraView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     private var cw: Colorway { settings.colorway }
+    @State private var topH: CGFloat = 52
+    @State private var bottomH: CGFloat = 300
+    private var fullScreen: Bool { settings.fullScreenPreview }
+    /// Labels sit on the picture in full-screen mode, so they turn white.
+    private var ink: Color { fullScreen ? .white : cw.ink }
+    private var safeInsets: UIEdgeInsets {
+        UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first?.keyWindow?.safeAreaInsets ?? UIEdgeInsets(top: 59, left: 0, bottom: 34, right: 0)
+    }
+    /// Space the picture's own overlays (badges, histogram) keep clear of the top bar in full-screen mode.
+    private var vfTop: CGFloat { fullScreen ? safeInsets.top + topH + 6 : 0 }
     /// With no live Style or overlay the system's own preview layer is used, exactly what the iPhone Camera app shows.
     private var useNativePreview: Bool { settings.systemPreview && model.style.id == "standard" && !settings.zebra && !settings.focusPeaking }
 
     var body: some View {
         ZStack {
             cw.bodyColor.ignoresSafeArea()
-            VStack(spacing: 10) {
+            viewfinder
+                .padding(.horizontal, fullScreen ? 0 : 6)
+                .padding(.top, fullScreen ? 0 : topH + 10)
+                .padding(.bottom, fullScreen ? 0 : bottomH + 10)
+                .ignoresSafeArea(edges: fullScreen ? .all : [])
+            VStack(spacing: 0) {
                 topBar
-                viewfinder.padding(.horizontal, -10)   // nearly edge to edge
-                if model.isManual { manualStrip.transition(.move(edge: .bottom).combined(with: .opacity)) }
-                controls
-                switches
+                    .padding(.horizontal, 16).padding(.bottom, fullScreen ? 24 : 0)
+                    .background(alignment: .top) {
+                        if fullScreen { LinearGradient(colors: [.black.opacity(0.5), .clear], startPoint: .top, endPoint: .bottom).ignoresSafeArea(edges: .top) }
+                    }
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { topH = $0 }
+                Spacer(minLength: 0)
+                VStack(spacing: 10) {
+                    if model.isManual { manualStrip.transition(.move(edge: .bottom).combined(with: .opacity)) }
+                    controls
+                    switches
+                }
+                .padding(.horizontal, 16).padding(.bottom, 8).padding(.top, fullScreen ? 28 : 0)
+                .background(alignment: .bottom) {
+                    if fullScreen { LinearGradient(colors: [.clear, .black.opacity(0.62)], startPoint: .top, endPoint: .bottom).ignoresSafeArea(edges: .bottom) }
+                }
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { bottomH = $0 }
             }
-            .padding(.horizontal, 16).padding(.bottom, 8)
         }
+        .animation(.easeInOut(duration: 0.3), value: settings.fullScreenPreview)
         .environmentObject(tilt)
-        .preferredColorScheme(cw.isDarkBody ? .dark : .light)
+        .preferredColorScheme(fullScreen || cw.isDarkBody ? .dark : .light)   // light status bar over the full-screen picture
         .animation(.easeInOut(duration: 0.2), value: model.isManual)
         .animation(.spring(), value: stats.justUnlocked?.id)
         .onAppear { model.start(); RollStore.shared.developDue(); UIApplication.shared.isIdleTimerDisabled = settings.keepAwake }
@@ -116,13 +143,19 @@ struct CameraView: View {
             roundButton("gearshape.fill") { showSettings = true }
             roundButton("trophy.fill") { showAchievements = true }
             Spacer()
+            Button {
+                withAnimation(.easeInOut(duration: 0.3)) { settings.fullScreenPreview.toggle() }
+                Feedback.toggle()
+            } label: { icon(fullScreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right") }
+                .accessibilityLabel(fullScreen ? "Exit full screen" : "Full screen preview")
             Menu {
                 Picker("Aspect ratio", selection: $settings.aspect) { ForEach(AspectOption.allCases) { Text($0.rawValue).tag($0) } }
             } label: {
-                Text(settings.aspect.rawValue).font(.system(size: 13, weight: .heavy, design: .rounded)).lineLimit(1).minimumScaleFactor(0.8)
+                Text(fullScreen ? "Full" : settings.aspect.rawValue).font(.system(size: 13, weight: .heavy, design: .rounded)).lineLimit(1).minimumScaleFactor(0.8)
                     .foregroundStyle(cw.ink).frame(width: 52, height: 40)
                     .background(cw.panelColor, in: RoundedRectangle(cornerRadius: 10))
             }
+            .disabled(fullScreen).opacity(fullScreen ? 0.6 : 1)
             .accessibilityLabel("Aspect ratio")
             Button { cycleFlash() } label: {
                 Image(systemName: model.flash == .off ? "bolt.slash.fill" : (model.flash == .auto ? "bolt.badge.automatic.fill" : "bolt.fill"))
@@ -156,7 +189,7 @@ struct CameraView: View {
     // MARK: Viewfinder
     private var viewfinder: some View {
         GeometryReader { g in
-            let r = settings.aspect.ratio
+            let r = fullScreen ? g.size.width / g.size.height : settings.aspect.ratio
             let width = min(g.size.width, g.size.height * r)
             let size = CGSize(width: width, height: width / r)
             ZStack {
@@ -180,10 +213,10 @@ struct CameraView: View {
                     TimelineView(.periodic(from: .now, by: 0.5)) { _ in Text(model.diagnostics + "\n" + model.rotationReport()) }
                         .font(.system(size: 9, weight: .medium, design: .monospaced)).foregroundStyle(.green)
                         .padding(5).background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 6))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).padding(8).allowsHitTesting(false)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).padding(8).padding(.top, vfTop).allowsHitTesting(false)
                 }
                 GridOverlay(style: settings.grid)
-                if settings.histogram && model.isManual && model.hasCamera { HistogramView(bins: model.histogram).frame(width: 96, height: 44).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).padding(10) }
+                if settings.histogram && model.isManual && model.hasCamera { HistogramView(bins: model.histogram).frame(width: 96, height: 44).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).padding(10).padding(.top, vfTop) }
                 if let p = model.focusPoint { FocusRing(manual: model.manualFocusActive, minFocusMM: model.minFocusMM).position(p) }
                 if let img = model.reviewImage { Image(uiImage: img).resizable().scaledToFill().transition(.opacity) }
                 VStack {
@@ -199,7 +232,7 @@ struct CameraView: View {
                             }.accessibilityLabel("Flip camera")
                         }.padding(.horizontal, 12)
                     }
-                    .padding(.bottom, 10)
+                    .padding(.bottom, fullScreen ? bottomH + safeInsets.bottom + 12 : 10)
                     // Step aside while the Style picker is up; slide back in when it goes away.
                     .opacity(styleToast ? 0 : 1)
                     .offset(y: styleToast ? 14 : 0)
@@ -210,17 +243,18 @@ struct CameraView: View {
                     Text(String(format: "● %02d:%02d", model.recordSeconds / 60, model.recordSeconds % 60))
                         .font(.system(size: 14, weight: .heavy, design: .rounded)).monospacedDigit().foregroundStyle(.white)
                         .padding(.horizontal, 10).padding(.vertical, 5).background(Color.red, in: Capsule())
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top).padding(.top, 12)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top).padding(.top, 12 + vfTop)
                 }
-                if settings.filmRoll && model.captureMode == .photo { rollBadge.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing).padding(12) }
+                if settings.filmRoll && model.captureMode == .photo { rollBadge.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing).padding(12).padding(.top, vfTop) }
                 StylePickerOverlay(styles: model.styles, index: $model.styleIndex, accent: cw.accentColor, visible: styleToast)
             }
             .frame(width: size.width, height: size.height)
-            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).strokeBorder(cw.panelColor, lineWidth: 5))
-            .shadow(color: .black.opacity(0.25), radius: 10, x: tilt.tilt.x * -4, y: tilt.tilt.y * -4 + 4)
+            .clipShape(RoundedRectangle(cornerRadius: fullScreen ? 0 : 26, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: fullScreen ? 0 : 26, style: .continuous).strokeBorder(cw.panelColor, lineWidth: fullScreen ? 0 : 5))
+            .shadow(color: .black.opacity(fullScreen ? 0 : 0.25), radius: fullScreen ? 0 : 10, x: tilt.tilt.x * -4, y: tilt.tilt.y * -4 + 4)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onAppear { model.setViewfinderSize(size) }
+            .onChange(of: size) { _, s in model.setViewfinderSize(s) }
             .onChange(of: settings.aspect) { _, _ in model.setViewfinderSize(CGSize(width: min(g.size.width, g.size.height * settings.aspect.ratio), height: min(g.size.width, g.size.height * settings.aspect.ratio) / settings.aspect.ratio)) }
             .gesture(DragGesture(minimumDistance: 0).onChanged { v in
                 let manualFocus = model.isManual && model.param == .focus
@@ -316,7 +350,7 @@ struct CameraView: View {
                 }
                 .frame(maxWidth: .infinity).padding(.vertical, 6)
                 .background(model.param == p ? cw.accentColor : cw.panelColor, in: RoundedRectangle(cornerRadius: 10))
-                .foregroundStyle(model.param == p ? .black : cw.ink)
+                .foregroundStyle(model.param == p ? .black : ink)
                 .onTapGesture { model.param = p; Feedback.tick() }
             }
         }
@@ -359,7 +393,7 @@ struct CameraView: View {
                 .background(cw.dialColor, in: Capsule()).foregroundStyle(.white)
             }.buttonStyle(.plain).transition(.scale.combined(with: .opacity))
         } else {
-            Text(value(for: model.param)).font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(cw.ink).monospacedDigit()
+            Text(value(for: model.param)).font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(ink).monospacedDigit()
                 .padding(.vertical, 4)
         }
     }
@@ -384,7 +418,7 @@ struct CameraView: View {
             Spacer()
             VStack(spacing: 6) {
                 DrumWheel(count: model.styles.count, index: $model.styleIndex, color: cw.accentColor, panel: cw.panelColor, ink: .black, onTap: openStylePicker)
-                Text(model.style.name.uppercased()).font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(cw.ink).lineLimit(1)
+                Text(model.style.name.uppercased()).font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(ink).lineLimit(1)
             }
         }
         .padding(.horizontal, 4)
@@ -404,20 +438,20 @@ struct CameraView: View {
         HStack {
             VStack(spacing: 6) {
                 modeToggle
-                Text(model.captureMode == .video ? "VIDEO" : "PHOTO").font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(cw.ink).tracking(1)
+                Text(model.captureMode == .video ? "VIDEO" : "PHOTO").font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(ink).tracking(1)
             }
             Spacer()
-            ChunkySwitch(top: "M", bottom: "A", isOn: $model.isManual, colorway: cw)
+            ChunkySwitch(top: "M", bottom: "A", isOn: $model.isManual, colorway: cw, labelColor: fullScreen ? .white : nil)
             Spacer()
             Button { model.cycleLens(); Feedback.toggle() } label: {
                 VStack(spacing: 6) {
                     ZStack {
                         Capsule().fill(cw.panelColor).frame(width: 78, height: 42)
-                        Image(systemName: "camera.aperture").font(.system(size: 18, weight: .bold)).foregroundStyle(cw.ink)
+                        Image(systemName: "plus.magnifyingglass").font(.system(size: 18, weight: .bold)).foregroundStyle(ink)
                     }
-                    Text("LENS").font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(cw.ink).tracking(1)
+                    Text("ZOOM").font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(ink).tracking(1)
                 }
-            }.buttonStyle(.plain)
+            }.buttonStyle(.plain).accessibilityLabel("Zoom")
         }
         .padding(.horizontal, 4)
     }
