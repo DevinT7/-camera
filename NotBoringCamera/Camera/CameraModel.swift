@@ -181,9 +181,7 @@ final class CameraModel: NSObject, ObservableObject {
         session.commitConfiguration()
         applyOrientation(for: pos)
         videoQueue.asyncAfter(deadline: .now() + 0.25) { self.previewGateOpen = true }
-        // New camera: re-learn what "upright" means for it if the phone is upright right now.
         videoQueue.async { self.lastBufferLandscape = nil; self.angleDirty = true; self.angleDirtyAt = Date() }
-        if let acc = motion.accelerometerData?.acceleration, acc.y < -0.92, abs(acc.x) < 0.3 { learnPortraitBase() }
 
         device = dev
         installCameraControls(dev)
@@ -251,36 +249,27 @@ final class CameraModel: NSObject, ObservableObject {
         return [l1, l2, l3].joined(separator: "\n")
     }
 
-    /// The accelerometer is only used to learn which coordinator angle means "phone upright" for the current camera.
-    /// (UIDevice.orientation isn't reliable here: with the interface locked to portrait it stays "portrait" while the phone turns.)
+    /// Which way the phone is physically held, from gravity. The viewfinder turn must not be derived from the camera's rotation
+    /// angle: that angle moves the opposite way on the selfie camera, which turned its preview upside down.
+    /// (UIDevice.orientation isn't reliable either: with the interface locked to portrait it stays "portrait".)
     private func startMotion() {
         guard motion.isAccelerometerAvailable, !motion.isAccelerometerActive else { return }
-        motion.accelerometerUpdateInterval = 0.1
+        motion.accelerometerUpdateInterval = 0.05
         motion.startAccelerometerUpdates(to: .main) { [weak self] data, _ in
             guard let self, let a = data?.acceleration else { return }
-            if a.y < -0.92, abs(a.x) < 0.3 { self.learnPortraitBase() }
-        }
-    }
-
-    private func learnPortraitBase() {
-        guard let cap = rotationCoordinator?.videoRotationAngleForHorizonLevelCapture else { return }
-        videoQueue.async { self.portraitBase = cap; self.angleDirty = true; self.angleDirtyAt = Date() }
-    }
-
-    /// Clockwise turn of the viewfinder box for a given horizon-level angle (0, 90, -90 or 180).
-    private func turn(for angle: CGFloat) -> Double {
-        let d = Int(((portraitBase - angle).truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360).rounded())
-        switch d {
-        case 45..<135: return 90
-        case 135..<225: return 180
-        case 225..<315: return -90
-        default: return 0
+            var t: Double?
+            if abs(a.x) > 0.65, abs(a.x) > abs(a.y) { t = a.x < 0 ? 90 : -90 }   // turned counter-clockwise: turn the picture clockwise
+            else if abs(a.y) > 0.65, abs(a.y) > abs(a.x) { t = a.y < 0 ? 0 : 180 }
+            guard let t else { return }                                           // flat: keep the last one
+            self.videoQueue.async {
+                if t != self.targetTurn { self.targetTurn = t; self.angleDirty = true; self.angleDirtyAt = Date() }
+            }
         }
     }
 
     // Read/written on videoQueue. A rotation change is committed (box turn + layer angle) only when the first frame in the new
     // orientation arrives, so the picture and the box change in the same instant instead of one trailing the other.
-    private var portraitBase: CGFloat = 90
+    private var targetTurn: Double = 0
     private var angleDirty = true
     private var angleDirtyAt = Date.distantPast
     private var lastBufferLandscape: Bool?
@@ -646,7 +635,7 @@ extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAu
             if classChanged || Date().timeIntervalSince(angleDirtyAt) > 0.15 {
                 angleDirty = false
                 let a = currentAngle()
-                let t = turn(for: a)
+                let t = targetTurn
                 DispatchQueue.main.async { self.deviceTurn = t; self.liveAngle = a }
             }
         }
