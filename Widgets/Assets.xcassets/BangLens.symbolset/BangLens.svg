@@ -17,50 +17,50 @@
   <line id="Baseline-L" stroke="#27AAE1" stroke-width="0.5" x1="263" x2="3036" y1="1556.0" y2="1556.0"/>
   <line id="Capline-L" stroke="#27AAE1" stroke-width="0.5" x1="263" x2="3036" y1="1485.541" y2="1485.541"/>
   <line id="Left-margin-Ultralight-S" stroke="#00AEEF" stroke-width="0.5" x1="553.0" x2="553.0" y1="606.0" y2="716.0"/>
-  <line id="Right-margin-Ultralight-S" stroke="#00AEEF" stroke-width="0.5" x1="633.96" x2="633.96" y1="606.0" y2="716.0"/>
+  <line id="Right-margin-Ultralight-S" stroke="#00AEEF" stroke-width="0.5" x1="654.2" x2="654.2" y1="606.0" y2="716.0"/>
   <line id="Left-margin-Ultralight-M" stroke="#00AEEF" stroke-width="0.5" x1="553.0" x2="553.0" y1="1036.0" y2="1146.0"/>
-  <line id="Right-margin-Ultralight-M" stroke="#00AEEF" stroke-width="0.5" x1="633.96" x2="633.96" y1="1036.0" y2="1146.0"/>
+  <line id="Right-margin-Ultralight-M" stroke="#00AEEF" stroke-width="0.5" x1="654.2" x2="654.2" y1="1036.0" y2="1146.0"/>
   <line id="Left-margin-Ultralight-L" stroke="#00AEEF" stroke-width="0.5" x1="553.0" x2="553.0" y1="1466.0" y2="1576.0"/>
-  <line id="Right-margin-Ultralight-L" stroke="#00AEEF" stroke-width="0.5" x1="633.96" x2="633.96" y1="1466.0" y2="1576.0"/>
+  <line id="Right-margin-Ultralight-L" stroke="#00AEEF" stroke-width="0.5" x1="654.2" x2="654.2" y1="1466.0" y2="1576.0"/>
   <line id="Left-margin-Regular-S" stroke="#00AEEF" stroke-width="0.5" x1="1650.0" x2="1650.0" y1="606.0" y2="716.0"/>
-  <line id="Right-margin-Regular-S" stroke="#00AEEF" stroke-width="0.5" x1="1730.96" x2="1730.96" y1="606.0" y2="716.0"/>
+  <line id="Right-margin-Regular-S" stroke="#00AEEF" stroke-width="0.5" x1="1751.2" x2="1751.2" y1="606.0" y2="716.0"/>
   <line id="Left-margin-Regular-M" stroke="#00AEEF" stroke-width="0.5" x1="1650.0" x2="1650.0" y1="1036.0" y2="1146.0"/>
-  <line id="Right-margin-Regular-M" stroke="#00AEEF" stroke-width="0.5" x1="1730.96" x2="1730.96" y1="1036.0" y2="1146.0"/>
+  <line id="Right-margin-Regular-M" stroke="#00AEEF" stroke-width="0.5" x1="1751.2" x2="1751.2" y1="1036.0" y2="1146.0"/>
   <line id="Left-margin-Regular-L" stroke="#00AEEF" stroke-width="0.5" x1="1650.0" x2="1650.0" y1="1466.0" y2="1576.0"/>
-  <line id="Right-margin-Regular-L" stroke="#00AEEF" stroke-width="0.5" x1="1730.96" x2="1730.96" y1="1466.0" y2="1576.0"/>
+  <line id="Right-margin-Regular-L" stroke="#00AEEF" stroke-width="0.5" x1="1751.2" x2="1751.2" y1="1466.0" y2="1576.0"/>
   <line id="Left-margin-Black-S" stroke="#00AEEF" stroke-width="0.5" x1="2747.0" x2="2747.0" y1="606.0" y2="716.0"/>
-  <line id="Right-margin-Black-S" stroke="#00AEEF" stroke-width="0.5" x1="2827.96" x2="2827.96" y1="606.0" y2="716.0"/>
+  <line id="Right-margin-Black-S" stroke="#00AEEF" stroke-width="0.5" x1="2848.2" x2="2848.2" y1="606.0" y2="716.0"/>
   <line id="Left-margin-Black-M" stroke="#00AEEF" stroke-width="0.5" x1="2747.0" x2="2747.0" y1="1036.0" y2="1146.0"/>
-  <line id="Right-margin-Black-M" stroke="#00AEEF" stroke-width="0.5" x1="2827.96" x2="2827.96" y1="1036.0" y2="1146.0"/>
+  <line id="Right-margin-Black-M" stroke="#00AEEF" stroke-width="0.5" x1="2848.2" x2="2848.2" y1="1036.0" y2="1146.0"/>
   <line id="Left-margin-Black-L" stroke="#00AEEF" stroke-width="0.5" x1="2747.0" x2="2747.0" y1="1466.0" y2="1576.0"/>
-  <line id="Right-margin-Black-L" stroke="#00AEEF" stroke-width="0.5" x1="2827.96" x2="2827.96" y1="1466.0" y2="1576.0"/>
+  <line id="Right-margin-Black-L" stroke="#00AEEF" stroke-width="0.5" x1="2848.2" x2="2848.2" y1="1466.0" y2="1576.0"/>
 </g>
 <g id="Symbols">
- <g id="Ultralight-S" transform="matrix(0.88 0 0 0.88 549.48 615.04)">
+ <g id="Ultralight-S" transform="matrix(1.1 0 0 1.1 548.6 594.8)">
   <path d="M28 8 H72 a24 24 0 0 1 24 24 V68 a24 24 0 0 1 -24 24 H28 a24 24 0 0 1 -24 -24 V32 a24 24 0 0 1 24 -24 Z M29 17 a16 16 0 0 0 -16 16 V67 a16 16 0 0 0 16 16 H71 a16 16 0 0 0 16 -16 V33 a16 16 0 0 0 -16 -16 Z M24 52 a26 26 0 1 1 52 0 a26 26 0 1 1 -52 0 Z M33 52 a17 17 0 1 0 34 0 a17 17 0 1 0 -34 0 Z M50.0 41 H49.99999999999999 a3.7 3.7 0 0 1 3.7 3.7 V51.8 a3.7 3.7 0 0 1 -3.7 3.7 H50.0 a3.7 3.7 0 0 1 -3.7 -3.7 V44.7 a3.7 3.7 0 0 1 3.7 -3.7 Z M46.1 63.2 a3.9 3.9 0 1 1 7.8 0 a3.9 3.9 0 1 1 -7.8 0 Z M30 1 H44 a6 6 0 0 1 6 6 V9 a6 6 0 0 1 -6 6 H30 a6 6 0 0 1 -6 -6 V7 a6 6 0 0 1 6 -6 Z M71.4 28 a5.6 5.6 0 1 1 11.2 0 a5.6 5.6 0 1 1 -11.2 0 Z " fill-rule="nonzero"/>
  </g>
- <g id="Ultralight-M" transform="matrix(0.88 0 0 0.88 549.48 1045.04)">
+ <g id="Ultralight-M" transform="matrix(1.1 0 0 1.1 548.6 1024.8)">
   <path d="M28 8 H72 a24 24 0 0 1 24 24 V68 a24 24 0 0 1 -24 24 H28 a24 24 0 0 1 -24 -24 V32 a24 24 0 0 1 24 -24 Z M29 17 a16 16 0 0 0 -16 16 V67 a16 16 0 0 0 16 16 H71 a16 16 0 0 0 16 -16 V33 a16 16 0 0 0 -16 -16 Z M24 52 a26 26 0 1 1 52 0 a26 26 0 1 1 -52 0 Z M33 52 a17 17 0 1 0 34 0 a17 17 0 1 0 -34 0 Z M50.0 41 H49.99999999999999 a3.7 3.7 0 0 1 3.7 3.7 V51.8 a3.7 3.7 0 0 1 -3.7 3.7 H50.0 a3.7 3.7 0 0 1 -3.7 -3.7 V44.7 a3.7 3.7 0 0 1 3.7 -3.7 Z M46.1 63.2 a3.9 3.9 0 1 1 7.8 0 a3.9 3.9 0 1 1 -7.8 0 Z M30 1 H44 a6 6 0 0 1 6 6 V9 a6 6 0 0 1 -6 6 H30 a6 6 0 0 1 -6 -6 V7 a6 6 0 0 1 6 -6 Z M71.4 28 a5.6 5.6 0 1 1 11.2 0 a5.6 5.6 0 1 1 -11.2 0 Z " fill-rule="nonzero"/>
  </g>
- <g id="Ultralight-L" transform="matrix(0.88 0 0 0.88 549.48 1475.04)">
+ <g id="Ultralight-L" transform="matrix(1.1 0 0 1.1 548.6 1454.8)">
   <path d="M28 8 H72 a24 24 0 0 1 24 24 V68 a24 24 0 0 1 -24 24 H28 a24 24 0 0 1 -24 -24 V32 a24 24 0 0 1 24 -24 Z M29 17 a16 16 0 0 0 -16 16 V67 a16 16 0 0 0 16 16 H71 a16 16 0 0 0 16 -16 V33 a16 16 0 0 0 -16 -16 Z M24 52 a26 26 0 1 1 52 0 a26 26 0 1 1 -52 0 Z M33 52 a17 17 0 1 0 34 0 a17 17 0 1 0 -34 0 Z M50.0 41 H49.99999999999999 a3.7 3.7 0 0 1 3.7 3.7 V51.8 a3.7 3.7 0 0 1 -3.7 3.7 H50.0 a3.7 3.7 0 0 1 -3.7 -3.7 V44.7 a3.7 3.7 0 0 1 3.7 -3.7 Z M46.1 63.2 a3.9 3.9 0 1 1 7.8 0 a3.9 3.9 0 1 1 -7.8 0 Z M30 1 H44 a6 6 0 0 1 6 6 V9 a6 6 0 0 1 -6 6 H30 a6 6 0 0 1 -6 -6 V7 a6 6 0 0 1 6 -6 Z M71.4 28 a5.6 5.6 0 1 1 11.2 0 a5.6 5.6 0 1 1 -11.2 0 Z " fill-rule="nonzero"/>
  </g>
- <g id="Regular-S" transform="matrix(0.88 0 0 0.88 1646.48 615.04)">
+ <g id="Regular-S" transform="matrix(1.1 0 0 1.1 1645.6 594.8)">
   <path d="M28 8 H72 a24 24 0 0 1 24 24 V68 a24 24 0 0 1 -24 24 H28 a24 24 0 0 1 -24 -24 V32 a24 24 0 0 1 24 -24 Z M29 17 a16 16 0 0 0 -16 16 V67 a16 16 0 0 0 16 16 H71 a16 16 0 0 0 16 -16 V33 a16 16 0 0 0 -16 -16 Z M24 52 a26 26 0 1 1 52 0 a26 26 0 1 1 -52 0 Z M33 52 a17 17 0 1 0 34 0 a17 17 0 1 0 -34 0 Z M50.0 41 H49.99999999999999 a3.7 3.7 0 0 1 3.7 3.7 V51.8 a3.7 3.7 0 0 1 -3.7 3.7 H50.0 a3.7 3.7 0 0 1 -3.7 -3.7 V44.7 a3.7 3.7 0 0 1 3.7 -3.7 Z M46.1 63.2 a3.9 3.9 0 1 1 7.8 0 a3.9 3.9 0 1 1 -7.8 0 Z M30 1 H44 a6 6 0 0 1 6 6 V9 a6 6 0 0 1 -6 6 H30 a6 6 0 0 1 -6 -6 V7 a6 6 0 0 1 6 -6 Z M71.4 28 a5.6 5.6 0 1 1 11.2 0 a5.6 5.6 0 1 1 -11.2 0 Z " fill-rule="nonzero"/>
  </g>
- <g id="Regular-M" transform="matrix(0.88 0 0 0.88 1646.48 1045.04)">
+ <g id="Regular-M" transform="matrix(1.1 0 0 1.1 1645.6 1024.8)">
   <path d="M28 8 H72 a24 24 0 0 1 24 24 V68 a24 24 0 0 1 -24 24 H28 a24 24 0 0 1 -24 -24 V32 a24 24 0 0 1 24 -24 Z M29 17 a16 16 0 0 0 -16 16 V67 a16 16 0 0 0 16 16 H71 a16 16 0 0 0 16 -16 V33 a16 16 0 0 0 -16 -16 Z M24 52 a26 26 0 1 1 52 0 a26 26 0 1 1 -52 0 Z M33 52 a17 17 0 1 0 34 0 a17 17 0 1 0 -34 0 Z M50.0 41 H49.99999999999999 a3.7 3.7 0 0 1 3.7 3.7 V51.8 a3.7 3.7 0 0 1 -3.7 3.7 H50.0 a3.7 3.7 0 0 1 -3.7 -3.7 V44.7 a3.7 3.7 0 0 1 3.7 -3.7 Z M46.1 63.2 a3.9 3.9 0 1 1 7.8 0 a3.9 3.9 0 1 1 -7.8 0 Z M30 1 H44 a6 6 0 0 1 6 6 V9 a6 6 0 0 1 -6 6 H30 a6 6 0 0 1 -6 -6 V7 a6 6 0 0 1 6 -6 Z M71.4 28 a5.6 5.6 0 1 1 11.2 0 a5.6 5.6 0 1 1 -11.2 0 Z " fill-rule="nonzero"/>
  </g>
- <g id="Regular-L" transform="matrix(0.88 0 0 0.88 1646.48 1475.04)">
+ <g id="Regular-L" transform="matrix(1.1 0 0 1.1 1645.6 1454.8)">
   <path d="M28 8 H72 a24 24 0 0 1 24 24 V68 a24 24 0 0 1 -24 24 H28 a24 24 0 0 1 -24 -24 V32 a24 24 0 0 1 24 -24 Z M29 17 a16 16 0 0 0 -16 16 V67 a16 16 0 0 0 16 16 H71 a16 16 0 0 0 16 -16 V33 a16 16 0 0 0 -16 -16 Z M24 52 a26 26 0 1 1 52 0 a26 26 0 1 1 -52 0 Z M33 52 a17 17 0 1 0 34 0 a17 17 0 1 0 -34 0 Z M50.0 41 H49.99999999999999 a3.7 3.7 0 0 1 3.7 3.7 V51.8 a3.7 3.7 0 0 1 -3.7 3.7 H50.0 a3.7 3.7 0 0 1 -3.7 -3.7 V44.7 a3.7 3.7 0 0 1 3.7 -3.7 Z M46.1 63.2 a3.9 3.9 0 1 1 7.8 0 a3.9 3.9 0 1 1 -7.8 0 Z M30 1 H44 a6 6 0 0 1 6 6 V9 a6 6 0 0 1 -6 6 H30 a6 6 0 0 1 -6 -6 V7 a6 6 0 0 1 6 -6 Z M71.4 28 a5.6 5.6 0 1 1 11.2 0 a5.6 5.6 0 1 1 -11.2 0 Z " fill-rule="nonzero"/>
  </g>
- <g id="Black-S" transform="matrix(0.88 0 0 0.88 2743.48 615.04)">
+ <g id="Black-S" transform="matrix(1.1 0 0 1.1 2742.6 594.8)">
   <path d="M28 8 H72 a24 24 0 0 1 24 24 V68 a24 24 0 0 1 -24 24 H28 a24 24 0 0 1 -24 -24 V32 a24 24 0 0 1 24 -24 Z M29 17 a16 16 0 0 0 -16 16 V67 a16 16 0 0 0 16 16 H71 a16 16 0 0 0 16 -16 V33 a16 16 0 0 0 -16 -16 Z M24 52 a26 26 0 1 1 52 0 a26 26 0 1 1 -52 0 Z M33 52 a17 17 0 1 0 34 0 a17 17 0 1 0 -34 0 Z M50.0 41 H49.99999999999999 a3.7 3.7 0 0 1 3.7 3.7 V51.8 a3.7 3.7 0 0 1 -3.7 3.7 H50.0 a3.7 3.7 0 0 1 -3.7 -3.7 V44.7 a3.7 3.7 0 0 1 3.7 -3.7 Z M46.1 63.2 a3.9 3.9 0 1 1 7.8 0 a3.9 3.9 0 1 1 -7.8 0 Z M30 1 H44 a6 6 0 0 1 6 6 V9 a6 6 0 0 1 -6 6 H30 a6 6 0 0 1 -6 -6 V7 a6 6 0 0 1 6 -6 Z M71.4 28 a5.6 5.6 0 1 1 11.2 0 a5.6 5.6 0 1 1 -11.2 0 Z " fill-rule="nonzero"/>
  </g>
- <g id="Black-M" transform="matrix(0.88 0 0 0.88 2743.48 1045.04)">
+ <g id="Black-M" transform="matrix(1.1 0 0 1.1 2742.6 1024.8)">
   <path d="M28 8 H72 a24 24 0 0 1 24 24 V68 a24 24 0 0 1 -24 24 H28 a24 24 0 0 1 -24 -24 V32 a24 24 0 0 1 24 -24 Z M29 17 a16 16 0 0 0 -16 16 V67 a16 16 0 0 0 16 16 H71 a16 16 0 0 0 16 -16 V33 a16 16 0 0 0 -16 -16 Z M24 52 a26 26 0 1 1 52 0 a26 26 0 1 1 -52 0 Z M33 52 a17 17 0 1 0 34 0 a17 17 0 1 0 -34 0 Z M50.0 41 H49.99999999999999 a3.7 3.7 0 0 1 3.7 3.7 V51.8 a3.7 3.7 0 0 1 -3.7 3.7 H50.0 a3.7 3.7 0 0 1 -3.7 -3.7 V44.7 a3.7 3.7 0 0 1 3.7 -3.7 Z M46.1 63.2 a3.9 3.9 0 1 1 7.8 0 a3.9 3.9 0 1 1 -7.8 0 Z M30 1 H44 a6 6 0 0 1 6 6 V9 a6 6 0 0 1 -6 6 H30 a6 6 0 0 1 -6 -6 V7 a6 6 0 0 1 6 -6 Z M71.4 28 a5.6 5.6 0 1 1 11.2 0 a5.6 5.6 0 1 1 -11.2 0 Z " fill-rule="nonzero"/>
  </g>
- <g id="Black-L" transform="matrix(0.88 0 0 0.88 2743.48 1475.04)">
+ <g id="Black-L" transform="matrix(1.1 0 0 1.1 2742.6 1454.8)">
   <path d="M28 8 H72 a24 24 0 0 1 24 24 V68 a24 24 0 0 1 -24 24 H28 a24 24 0 0 1 -24 -24 V32 a24 24 0 0 1 24 -24 Z M29 17 a16 16 0 0 0 -16 16 V67 a16 16 0 0 0 16 16 H71 a16 16 0 0 0 16 -16 V33 a16 16 0 0 0 -16 -16 Z M24 52 a26 26 0 1 1 52 0 a26 26 0 1 1 -52 0 Z M33 52 a17 17 0 1 0 34 0 a17 17 0 1 0 -34 0 Z M50.0 41 H49.99999999999999 a3.7 3.7 0 0 1 3.7 3.7 V51.8 a3.7 3.7 0 0 1 -3.7 3.7 H50.0 a3.7 3.7 0 0 1 -3.7 -3.7 V44.7 a3.7 3.7 0 0 1 3.7 -3.7 Z M46.1 63.2 a3.9 3.9 0 1 1 7.8 0 a3.9 3.9 0 1 1 -7.8 0 Z M30 1 H44 a6 6 0 0 1 6 6 V9 a6 6 0 0 1 -6 6 H30 a6 6 0 0 1 -6 -6 V7 a6 6 0 0 1 6 -6 Z M71.4 28 a5.6 5.6 0 1 1 11.2 0 a5.6 5.6 0 1 1 -11.2 0 Z " fill-rule="nonzero"/>
  </g>
 </g>
