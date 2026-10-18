@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--Generator: Apple Native Symbols Generator-->
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="3300" height="2200">
+<g id="Notes">
+  <rect height="2200" opacity="0" width="3300" x="0" y="0"/>
+  <text transform="matrix(1 0 0 1 263 322)" font-family="'SFPro-Medium', 'SF Pro'" font-size="13">Weight/Scale Variations</text>
+</g>
+<g id="Guides">
+  <g id="H-reference" style="fill:#27AAE1;stroke:none;" transform="matrix(1 0 0 1 339 696)">
+    <path d="M0.993654 0L3.63775 0L29.3281-67.1323L30.0303-67.1323L30.0303-70.459L28.1226-70.459L0.993654 0Z"/>
+  </g>
+  <line id="Baseline-S" stroke="#27AAE1" stroke-width="0.5" x1="263" x2="3036" y1="696.0" y2="696.0"/>
+  <line id="Capline-S" stroke="#27AAE1" stroke-width="0.5" x1="263" x2="3036" y1="625.5409999999999" y2="625.5409999999999"/>
+  <line id="Baseline-M" stroke="#27AAE1" stroke-width="0.5" x1="263" x2="3036" y1="1126.0" y2="1126.0"/>
+  <line id="Capline-M" stroke="#27AAE1" stroke-width="0.5" x1="263" x2="3036" y1="1055.541" y2="1055.541"/>
+  <line id="Baseline-L" stroke="#27AAE1" stroke-width="0.5" x1="263" x2="3036" y1="1556.0" y2="1556.0"/>
+  <line id="Capline-L" stroke="#27AAE1" stroke-width="0.5" x1="263" x2="3036" y1="1485.541" y2="1485.541"/>
+  <line id="Left-margin-Ultralight-S" stroke="#00AEEF" stroke-width="0.5" x1="553.0" x2="553.0" y1="606.0" y2="716.0"/>
+  <line id="Right-margin-Ultralight-S" stroke="#00AEEF" stroke-width="0.5" x1="603.0" x2="603.0" y1="606.0" y2="716.0"/>
+  <line id="Left-margin-Ultralight-M" stroke="#00AEEF" stroke-width="0.5" x1="553.0" x2="553.0" y1="1036.0" y2="1146.0"/>
+  <line id="Right-margin-Ultralight-M" stroke="#00AEEF" stroke-width="0.5" x1="603.0" x2="603.0" y1="1036.0" y2="1146.0"/>
+  <line id="Left-margin-Ultralight-L" stroke="#00AEEF" stroke-width="0.5" x1="553.0" x2="553.0" y1="1466.0" y2="1576.0"/>
+  <line id="Right-margin-Ultralight-L" stroke="#00AEEF" stroke-width="0.5" x1="603.0" x2="603.0" y1="1466.0" y2="1576.0"/>
+  <line id="Left-margin-Regular-S" stroke="#00AEEF" stroke-width="0.5" x1="1650.0" x2="1650.0" y1="606.0" y2="716.0"/>
+  <line id="Right-margin-Regular-S" stroke="#00AEEF" stroke-width="0.5" x1="1700.0" x2="1700.0" y1="606.0" y2="716.0"/>
+  <line id="Left-margin-Regular-M" stroke="#00AEEF" stroke-width="0.5" x1="1650.0" x2="1650.0" y1="1036.0" y2="1146.0"/>
+  <line id="Right-margin-Regular-M" stroke="#00AEEF" stroke-width="0.5" x1="1700.0" x2="1700.0" y1="1036.0" y2="1146.0"/>
+  <line id="Left-margin-Regular-L" stroke="#00AEEF" stroke-width="0.5" x1="1650.0" x2="1650.0" y1="1466.0" y2="1576.0"/>
+  <line id="Right-margin-Regular-L" stroke="#00AEEF" stroke-width="0.5" x1="1700.0" x2="1700.0" y1="1466.0" y2="1576.0"/>
+  <line id="Left-margin-Black-S" stroke="#00AEEF" stroke-width="0.5" x1="2747.0" x2="2747.0" y1="606.0" y2="716.0"/>
+  <line id="Right-margin-Black-S" stroke="#00AEEF" stroke-width="0.5" x1="2797.0" x2="2797.0" y1="606.0" y2="716.0"/>
+  <line id="Left-margin-Black-M" stroke="#00AEEF" stroke-width="0.5" x1="2747.0" x2="2747.0" y1="1036.0" y2="1146.0"/>
+  <line id="Right-margin-Black-M" stroke="#00AEEF" stroke-width="0.5" x1="2797.0" x2="2797.0" y1="1036.0" y2="1146.0"/>
+  <line id="Left-margin-Black-L" stroke="#00AEEF" stroke-width="0.5" x1="2747.0" x2="2747.0" y1="1466.0" y2="1576.0"/>
+  <line id="Right-margin-Black-L" stroke="#00AEEF" stroke-width="0.5" x1="2797.0" x2="2797.0" y1="1466.0" y2="1576.0"/>
+</g>
+<g id="Symbols">
+ <g id="Ultralight-S" transform="matrix(1 0 0 1 553.0 696.0)">
+  <path d="M33 -62.46 a8 8 0 0 0 -16 0 L17 -42.46 a8 8 0 0 0 16 0 Z M25 -28 a14 14 0 1 0 0 28 a14 14 0 1 0 0 -28 Z M25 -20 a6 6 0 1 1 0 12 a6 6 0 1 1 0 -12 Z"/>
+ </g>
+ <g id="Ultralight-M" transform="matrix(1 0 0 1 553.0 1126.0)">
+  <path d="M33 -62.46 a8 8 0 0 0 -16 0 L17 -42.46 a8 8 0 0 0 16 0 Z M25 -28 a14 14 0 1 0 0 28 a14 14 0 1 0 0 -28 Z M25 -20 a6 6 0 1 1 0 12 a6 6 0 1 1 0 -12 Z"/>
+ </g>
+ <g id="Ultralight-L" transform="matrix(1 0 0 1 553.0 1556.0)">
+  <path d="M33 -62.46 a8 8 0 0 0 -16 0 L17 -42.46 a8 8 0 0 0 16 0 Z M25 -28 a14 14 0 1 0 0 28 a14 14 0 1 0 0 -28 Z M25 -20 a6 6 0 1 1 0 12 a6 6 0 1 1 0 -12 Z"/>
+ </g>
+ <g id="Regular-S" transform="matrix(1 0 0 1 1650.0 696.0)">
+  <path d="M33 -62.46 a8 8 0 0 0 -16 0 L17 -42.46 a8 8 0 0 0 16 0 Z M25 -28 a14 14 0 1 0 0 28 a14 14 0 1 0 0 -28 Z M25 -20 a6 6 0 1 1 0 12 a6 6 0 1 1 0 -12 Z"/>
+ </g>
+ <g id="Regular-M" transform="matrix(1 0 0 1 1650.0 1126.0)">
+  <path d="M33 -62.46 a8 8 0 0 0 -16 0 L17 -42.46 a8 8 0 0 0 16 0 Z M25 -28 a14 14 0 1 0 0 28 a14 14 0 1 0 0 -28 Z M25 -20 a6 6 0 1 1 0 12 a6 6 0 1 1 0 -12 Z"/>
+ </g>
+ <g id="Regular-L" transform="matrix(1 0 0 1 1650.0 1556.0)">
+  <path d="M33 -62.46 a8 8 0 0 0 -16 0 L17 -42.46 a8 8 0 0 0 16 0 Z M25 -28 a14 14 0 1 0 0 28 a14 14 0 1 0 0 -28 Z M25 -20 a6 6 0 1 1 0 12 a6 6 0 1 1 0 -12 Z"/>
+ </g>
+ <g id="Black-S" transform="matrix(1 0 0 1 2747.0 696.0)">
+  <path d="M33 -62.46 a8 8 0 0 0 -16 0 L17 -42.46 a8 8 0 0 0 16 0 Z M25 -28 a14 14 0 1 0 0 28 a14 14 0 1 0 0 -28 Z M25 -20 a6 6 0 1 1 0 12 a6 6 0 1 1 0 -12 Z"/>
+ </g>
+ <g id="Black-M" transform="matrix(1 0 0 1 2747.0 1126.0)">
+  <path d="M33 -62.46 a8 8 0 0 0 -16 0 L17 -42.46 a8 8 0 0 0 16 0 Z M25 -28 a14 14 0 1 0 0 28 a14 14 0 1 0 0 -28 Z M25 -20 a6 6 0 1 1 0 12 a6 6 0 1 1 0 -12 Z"/>
+ </g>
+ <g id="Black-L" transform="matrix(1 0 0 1 2747.0 1556.0)">
+  <path d="M33 -62.46 a8 8 0 0 0 -16 0 L17 -42.46 a8 8 0 0 0 16 0 Z M25 -28 a14 14 0 1 0 0 28 a14 14 0 1 0 0 -28 Z M25 -20 a6 6 0 1 1 0 12 a6 6 0 1 1 0 -12 Z"/>
+ </g>
+</g>
+</svg>

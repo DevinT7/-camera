@@ -86,7 +86,8 @@ struct CameraView: View {
         .onChange(of: settings.histogram) { _, _ in model.pushRenderState() }
         .sheet(isPresented: $showSettings) { SettingsView().environmentObject(settings).environmentObject(model) }
         .sheet(isPresented: $showAchievements) { AchievementsView() }
-        .overlay(alignment: .top) { unlockToast; developedToast }
+        .overlay(alignment: .top) { unlockToast }
+        .sheet(item: $roll.developed) { DevelopedRollView(roll: $0) }
         .overlay { if model.screenFlashing { Color(red: 1, green: 0.96, blue: 0.9).ignoresSafeArea().allowsHitTesting(false).transition(.opacity) } }
         .sheet(isPresented: $showLab) { PhotoLabView().environmentObject(settings).environmentObject(model) }
     }
@@ -102,20 +103,6 @@ struct CameraView: View {
             }
             .padding(10).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18)).padding(.top, 54)
             .transition(.move(edge: .top).combined(with: .opacity)).onTapGesture { showAchievements = true }
-        }
-    }
-
-    @ViewBuilder private var developedToast: some View {
-        if let n = roll.developedCount {
-            HStack(spacing: 10) {
-                Image(systemName: "photo.stack.fill").font(.system(size: 24)).foregroundStyle(cw.accentColor)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Roll developed").font(.system(size: 10, weight: .heavy, design: .rounded)).foregroundStyle(.secondary)
-                    Text("\(n) photos are in your library").font(.system(size: 15, weight: .heavy, design: .rounded))
-                }
-            }
-            .padding(10).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18)).padding(.top, 54)
-            .transition(.move(edge: .top).combined(with: .opacity))
         }
     }
 

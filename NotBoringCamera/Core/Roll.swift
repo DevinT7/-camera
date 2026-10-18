@@ -18,7 +18,8 @@ final class RollStore: ObservableObject {
     static let developDelay: TimeInterval = 24 * 3600
 
     @Published private(set) var rolls: [FilmRoll] = []
-    @Published var developedCount: Int?
+    /// Set when a roll finishes developing; the camera screen presents the reveal + contact sheet for it.
+    @Published var developed: DevelopedRoll?
 
     private static let dir: URL = {
         let d = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("FilmRolls", isDirectory: true)
@@ -68,6 +69,7 @@ final class RollStore: ObservableObject {
         for roll in due {
             let urls = roll.files.map { Self.dir.appendingPathComponent($0) }
             let blobs = urls.compactMap { try? Data(contentsOf: $0) }
+            let thumbs = blobs.compactMap { RollThumbs.thumbnail(from: $0) }
             let group = DispatchGroup()
             var failed = false
             for d in blobs {
@@ -80,9 +82,8 @@ final class RollStore: ObservableObject {
                 RollNotifications.cancel(rollID: roll.id)
                 self.rolls.removeAll { $0.id == roll.id }
                 self.persist()
-                self.developedCount = (self.developedCount ?? 0) + blobs.count
                 StatsStore.shared.recordRollDeveloped()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 4) { self.developedCount = nil }
+                self.developed = DevelopedRoll(frames: thumbs, date: roll.lastShot ?? Date(), size: roll.size)
             }
         }
     }

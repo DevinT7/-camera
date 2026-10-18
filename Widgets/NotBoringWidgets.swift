@@ -75,7 +75,7 @@ struct LaunchWidgetView: View {
         Group {
             switch family {
             case .accessoryCircular:
-                ZStack { AccessoryWidgetBackground(); Image("BangLens").resizable().scaledToFit().padding(11).widgetAccentable() }
+                ZStack { AccessoryWidgetBackground(); Image("BangLens").font(.system(size: 24, weight: .bold)).widgetAccentable() }
             case .accessoryInline:
                 Label("Open !Camera", systemImage: "camera.fill")
             case .accessoryRectangular:
