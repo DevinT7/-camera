@@ -17,51 +17,51 @@
   <line id="Baseline-L" stroke="#27AAE1" stroke-width="0.5" x1="263" x2="3036" y1="1556.0" y2="1556.0"/>
   <line id="Capline-L" stroke="#27AAE1" stroke-width="0.5" x1="263" x2="3036" y1="1485.541" y2="1485.541"/>
   <line id="Left-margin-Ultralight-S" stroke="#00AEEF" stroke-width="0.5" x1="553.0" x2="553.0" y1="606.0" y2="716.0"/>
-  <line id="Right-margin-Ultralight-S" stroke="#00AEEF" stroke-width="0.5" x1="723.2" x2="723.2" y1="606.0" y2="716.0"/>
+  <line id="Right-margin-Ultralight-S" stroke="#00AEEF" stroke-width="0.5" x1="700.2" x2="700.2" y1="606.0" y2="716.0"/>
   <line id="Left-margin-Ultralight-M" stroke="#00AEEF" stroke-width="0.5" x1="553.0" x2="553.0" y1="1036.0" y2="1146.0"/>
-  <line id="Right-margin-Ultralight-M" stroke="#00AEEF" stroke-width="0.5" x1="723.2" x2="723.2" y1="1036.0" y2="1146.0"/>
+  <line id="Right-margin-Ultralight-M" stroke="#00AEEF" stroke-width="0.5" x1="700.2" x2="700.2" y1="1036.0" y2="1146.0"/>
   <line id="Left-margin-Ultralight-L" stroke="#00AEEF" stroke-width="0.5" x1="553.0" x2="553.0" y1="1466.0" y2="1576.0"/>
-  <line id="Right-margin-Ultralight-L" stroke="#00AEEF" stroke-width="0.5" x1="723.2" x2="723.2" y1="1466.0" y2="1576.0"/>
+  <line id="Right-margin-Ultralight-L" stroke="#00AEEF" stroke-width="0.5" x1="700.2" x2="700.2" y1="1466.0" y2="1576.0"/>
   <line id="Left-margin-Regular-S" stroke="#00AEEF" stroke-width="0.5" x1="1650.0" x2="1650.0" y1="606.0" y2="716.0"/>
-  <line id="Right-margin-Regular-S" stroke="#00AEEF" stroke-width="0.5" x1="1820.2" x2="1820.2" y1="606.0" y2="716.0"/>
+  <line id="Right-margin-Regular-S" stroke="#00AEEF" stroke-width="0.5" x1="1797.2" x2="1797.2" y1="606.0" y2="716.0"/>
   <line id="Left-margin-Regular-M" stroke="#00AEEF" stroke-width="0.5" x1="1650.0" x2="1650.0" y1="1036.0" y2="1146.0"/>
-  <line id="Right-margin-Regular-M" stroke="#00AEEF" stroke-width="0.5" x1="1820.2" x2="1820.2" y1="1036.0" y2="1146.0"/>
+  <line id="Right-margin-Regular-M" stroke="#00AEEF" stroke-width="0.5" x1="1797.2" x2="1797.2" y1="1036.0" y2="1146.0"/>
   <line id="Left-margin-Regular-L" stroke="#00AEEF" stroke-width="0.5" x1="1650.0" x2="1650.0" y1="1466.0" y2="1576.0"/>
-  <line id="Right-margin-Regular-L" stroke="#00AEEF" stroke-width="0.5" x1="1820.2" x2="1820.2" y1="1466.0" y2="1576.0"/>
+  <line id="Right-margin-Regular-L" stroke="#00AEEF" stroke-width="0.5" x1="1797.2" x2="1797.2" y1="1466.0" y2="1576.0"/>
   <line id="Left-margin-Black-S" stroke="#00AEEF" stroke-width="0.5" x1="2747.0" x2="2747.0" y1="606.0" y2="716.0"/>
-  <line id="Right-margin-Black-S" stroke="#00AEEF" stroke-width="0.5" x1="2917.2" x2="2917.2" y1="606.0" y2="716.0"/>
+  <line id="Right-margin-Black-S" stroke="#00AEEF" stroke-width="0.5" x1="2894.2" x2="2894.2" y1="606.0" y2="716.0"/>
   <line id="Left-margin-Black-M" stroke="#00AEEF" stroke-width="0.5" x1="2747.0" x2="2747.0" y1="1036.0" y2="1146.0"/>
-  <line id="Right-margin-Black-M" stroke="#00AEEF" stroke-width="0.5" x1="2917.2" x2="2917.2" y1="1036.0" y2="1146.0"/>
+  <line id="Right-margin-Black-M" stroke="#00AEEF" stroke-width="0.5" x1="2894.2" x2="2894.2" y1="1036.0" y2="1146.0"/>
   <line id="Left-margin-Black-L" stroke="#00AEEF" stroke-width="0.5" x1="2747.0" x2="2747.0" y1="1466.0" y2="1576.0"/>
-  <line id="Right-margin-Black-L" stroke="#00AEEF" stroke-width="0.5" x1="2917.2" x2="2917.2" y1="1466.0" y2="1576.0"/>
+  <line id="Right-margin-Black-L" stroke="#00AEEF" stroke-width="0.5" x1="2894.2" x2="2894.2" y1="1466.0" y2="1576.0"/>
 </g>
 <g id="Symbols">
- <g id="Ultralight-S" transform="matrix(1.85 0 0 1.85 545.6 574.745)">
-  <path d="M28 8 H72 a24 24 0 0 1 24 24 V68 a24 24 0 0 1 -24 24 H28 a24 24 0 0 1 -24 -24 V32 a24 24 0 0 1 24 -24 Z M29 17 a16 16 0 0 0 -16 16 V67 a16 16 0 0 0 16 16 H71 a16 16 0 0 0 16 -16 V33 a16 16 0 0 0 -16 -16 Z M24 52 a26 26 0 1 1 52 0 a26 26 0 1 1 -52 0 Z M33 52 a17 17 0 1 0 34 0 a17 17 0 1 0 -34 0 Z M30 1 H44 a6 6 0 0 1 6 6 V9 a6 6 0 0 1 -6 6 H30 a6 6 0 0 1 -6 -6 V7 a6 6 0 0 1 6 -6 Z M41.5 52 a8.5 8.5 0 1 1 17.0 0 a8.5 8.5 0 1 1 -17.0 0 Z M71.4 28 a5.6 5.6 0 1 1 11.2 0 a5.6 5.6 0 1 1 -11.2 0 Z " fill-rule="nonzero"/>
+ <g id="Ultralight-S" transform="matrix(1.6 0 0 1.6 546.6 580.77)">
+  <path d="M4 50 a46 46 0 1 1 92 0 a46 46 0 1 1 -92 0 Z M11 50 a39 39 0 1 0 78 0 a39 39 0 1 0 -78 0 Z M80.00 50.00 L65.00 75.98 L35.00 75.98 L20.00 50.00 L35.00 24.02 L65.00 24.02 Z M62.99 42.50 L50.00 35.00 L37.01 42.50 L37.01 57.50 L50.00 65.00 L62.99 57.50 Z " fill-rule="nonzero"/>
  </g>
- <g id="Ultralight-M" transform="matrix(1.85 0 0 1.85 545.6 1004.745)">
-  <path d="M28 8 H72 a24 24 0 0 1 24 24 V68 a24 24 0 0 1 -24 24 H28 a24 24 0 0 1 -24 -24 V32 a24 24 0 0 1 24 -24 Z M29 17 a16 16 0 0 0 -16 16 V67 a16 16 0 0 0 16 16 H71 a16 16 0 0 0 16 -16 V33 a16 16 0 0 0 -16 -16 Z M24 52 a26 26 0 1 1 52 0 a26 26 0 1 1 -52 0 Z M33 52 a17 17 0 1 0 34 0 a17 17 0 1 0 -34 0 Z M30 1 H44 a6 6 0 0 1 6 6 V9 a6 6 0 0 1 -6 6 H30 a6 6 0 0 1 -6 -6 V7 a6 6 0 0 1 6 -6 Z M41.5 52 a8.5 8.5 0 1 1 17.0 0 a8.5 8.5 0 1 1 -17.0 0 Z M71.4 28 a5.6 5.6 0 1 1 11.2 0 a5.6 5.6 0 1 1 -11.2 0 Z " fill-rule="nonzero"/>
+ <g id="Ultralight-M" transform="matrix(1.6 0 0 1.6 546.6 1010.77)">
+  <path d="M4 50 a46 46 0 1 1 92 0 a46 46 0 1 1 -92 0 Z M11 50 a39 39 0 1 0 78 0 a39 39 0 1 0 -78 0 Z M80.00 50.00 L65.00 75.98 L35.00 75.98 L20.00 50.00 L35.00 24.02 L65.00 24.02 Z M62.99 42.50 L50.00 35.00 L37.01 42.50 L37.01 57.50 L50.00 65.00 L62.99 57.50 Z " fill-rule="nonzero"/>
  </g>
- <g id="Ultralight-L" transform="matrix(1.85 0 0 1.85 545.6 1434.745)">
-  <path d="M28 8 H72 a24 24 0 0 1 24 24 V68 a24 24 0 0 1 -24 24 H28 a24 24 0 0 1 -24 -24 V32 a24 24 0 0 1 24 -24 Z M29 17 a16 16 0 0 0 -16 16 V67 a16 16 0 0 0 16 16 H71 a16 16 0 0 0 16 -16 V33 a16 16 0 0 0 -16 -16 Z M24 52 a26 26 0 1 1 52 0 a26 26 0 1 1 -52 0 Z M33 52 a17 17 0 1 0 34 0 a17 17 0 1 0 -34 0 Z M30 1 H44 a6 6 0 0 1 6 6 V9 a6 6 0 0 1 -6 6 H30 a6 6 0 0 1 -6 -6 V7 a6 6 0 0 1 6 -6 Z M41.5 52 a8.5 8.5 0 1 1 17.0 0 a8.5 8.5 0 1 1 -17.0 0 Z M71.4 28 a5.6 5.6 0 1 1 11.2 0 a5.6 5.6 0 1 1 -11.2 0 Z " fill-rule="nonzero"/>
+ <g id="Ultralight-L" transform="matrix(1.6 0 0 1.6 546.6 1440.77)">
+  <path d="M4 50 a46 46 0 1 1 92 0 a46 46 0 1 1 -92 0 Z M11 50 a39 39 0 1 0 78 0 a39 39 0 1 0 -78 0 Z M80.00 50.00 L65.00 75.98 L35.00 75.98 L20.00 50.00 L35.00 24.02 L65.00 24.02 Z M62.99 42.50 L50.00 35.00 L37.01 42.50 L37.01 57.50 L50.00 65.00 L62.99 57.50 Z " fill-rule="nonzero"/>
  </g>
- <g id="Regular-S" transform="matrix(1.85 0 0 1.85 1642.6 574.745)">
-  <path d="M28 8 H72 a24 24 0 0 1 24 24 V68 a24 24 0 0 1 -24 24 H28 a24 24 0 0 1 -24 -24 V32 a24 24 0 0 1 24 -24 Z M29 17 a16 16 0 0 0 -16 16 V67 a16 16 0 0 0 16 16 H71 a16 16 0 0 0 16 -16 V33 a16 16 0 0 0 -16 -16 Z M24 52 a26 26 0 1 1 52 0 a26 26 0 1 1 -52 0 Z M33 52 a17 17 0 1 0 34 0 a17 17 0 1 0 -34 0 Z M30 1 H44 a6 6 0 0 1 6 6 V9 a6 6 0 0 1 -6 6 H30 a6 6 0 0 1 -6 -6 V7 a6 6 0 0 1 6 -6 Z M41.5 52 a8.5 8.5 0 1 1 17.0 0 a8.5 8.5 0 1 1 -17.0 0 Z M71.4 28 a5.6 5.6 0 1 1 11.2 0 a5.6 5.6 0 1 1 -11.2 0 Z " fill-rule="nonzero"/>
+ <g id="Regular-S" transform="matrix(1.6 0 0 1.6 1643.6 580.77)">
+  <path d="M4 50 a46 46 0 1 1 92 0 a46 46 0 1 1 -92 0 Z M11 50 a39 39 0 1 0 78 0 a39 39 0 1 0 -78 0 Z M80.00 50.00 L65.00 75.98 L35.00 75.98 L20.00 50.00 L35.00 24.02 L65.00 24.02 Z M62.99 42.50 L50.00 35.00 L37.01 42.50 L37.01 57.50 L50.00 65.00 L62.99 57.50 Z " fill-rule="nonzero"/>
  </g>
- <g id="Regular-M" transform="matrix(1.85 0 0 1.85 1642.6 1004.745)">
-  <path d="M28 8 H72 a24 24 0 0 1 24 24 V68 a24 24 0 0 1 -24 24 H28 a24 24 0 0 1 -24 -24 V32 a24 24 0 0 1 24 -24 Z M29 17 a16 16 0 0 0 -16 16 V67 a16 16 0 0 0 16 16 H71 a16 16 0 0 0 16 -16 V33 a16 16 0 0 0 -16 -16 Z M24 52 a26 26 0 1 1 52 0 a26 26 0 1 1 -52 0 Z M33 52 a17 17 0 1 0 34 0 a17 17 0 1 0 -34 0 Z M30 1 H44 a6 6 0 0 1 6 6 V9 a6 6 0 0 1 -6 6 H30 a6 6 0 0 1 -6 -6 V7 a6 6 0 0 1 6 -6 Z M41.5 52 a8.5 8.5 0 1 1 17.0 0 a8.5 8.5 0 1 1 -17.0 0 Z M71.4 28 a5.6 5.6 0 1 1 11.2 0 a5.6 5.6 0 1 1 -11.2 0 Z " fill-rule="nonzero"/>
+ <g id="Regular-M" transform="matrix(1.6 0 0 1.6 1643.6 1010.77)">
+  <path d="M4 50 a46 46 0 1 1 92 0 a46 46 0 1 1 -92 0 Z M11 50 a39 39 0 1 0 78 0 a39 39 0 1 0 -78 0 Z M80.00 50.00 L65.00 75.98 L35.00 75.98 L20.00 50.00 L35.00 24.02 L65.00 24.02 Z M62.99 42.50 L50.00 35.00 L37.01 42.50 L37.01 57.50 L50.00 65.00 L62.99 57.50 Z " fill-rule="nonzero"/>
  </g>
- <g id="Regular-L" transform="matrix(1.85 0 0 1.85 1642.6 1434.745)">
-  <path d="M28 8 H72 a24 24 0 0 1 24 24 V68 a24 24 0 0 1 -24 24 H28 a24 24 0 0 1 -24 -24 V32 a24 24 0 0 1 24 -24 Z M29 17 a16 16 0 0 0 -16 16 V67 a16 16 0 0 0 16 16 H71 a16 16 0 0 0 16 -16 V33 a16 16 0 0 0 -16 -16 Z M24 52 a26 26 0 1 1 52 0 a26 26 0 1 1 -52 0 Z M33 52 a17 17 0 1 0 34 0 a17 17 0 1 0 -34 0 Z M30 1 H44 a6 6 0 0 1 6 6 V9 a6 6 0 0 1 -6 6 H30 a6 6 0 0 1 -6 -6 V7 a6 6 0 0 1 6 -6 Z M41.5 52 a8.5 8.5 0 1 1 17.0 0 a8.5 8.5 0 1 1 -17.0 0 Z M71.4 28 a5.6 5.6 0 1 1 11.2 0 a5.6 5.6 0 1 1 -11.2 0 Z " fill-rule="nonzero"/>
+ <g id="Regular-L" transform="matrix(1.6 0 0 1.6 1643.6 1440.77)">
+  <path d="M4 50 a46 46 0 1 1 92 0 a46 46 0 1 1 -92 0 Z M11 50 a39 39 0 1 0 78 0 a39 39 0 1 0 -78 0 Z M80.00 50.00 L65.00 75.98 L35.00 75.98 L20.00 50.00 L35.00 24.02 L65.00 24.02 Z M62.99 42.50 L50.00 35.00 L37.01 42.50 L37.01 57.50 L50.00 65.00 L62.99 57.50 Z " fill-rule="nonzero"/>
  </g>
- <g id="Black-S" transform="matrix(1.85 0 0 1.85 2739.6 574.745)">
-  <path d="M28 8 H72 a24 24 0 0 1 24 24 V68 a24 24 0 0 1 -24 24 H28 a24 24 0 0 1 -24 -24 V32 a24 24 0 0 1 24 -24 Z M29 17 a16 16 0 0 0 -16 16 V67 a16 16 0 0 0 16 16 H71 a16 16 0 0 0 16 -16 V33 a16 16 0 0 0 -16 -16 Z M24 52 a26 26 0 1 1 52 0 a26 26 0 1 1 -52 0 Z M33 52 a17 17 0 1 0 34 0 a17 17 0 1 0 -34 0 Z M30 1 H44 a6 6 0 0 1 6 6 V9 a6 6 0 0 1 -6 6 H30 a6 6 0 0 1 -6 -6 V7 a6 6 0 0 1 6 -6 Z M41.5 52 a8.5 8.5 0 1 1 17.0 0 a8.5 8.5 0 1 1 -17.0 0 Z M71.4 28 a5.6 5.6 0 1 1 11.2 0 a5.6 5.6 0 1 1 -11.2 0 Z " fill-rule="nonzero"/>
+ <g id="Black-S" transform="matrix(1.6 0 0 1.6 2740.6 580.77)">
+  <path d="M4 50 a46 46 0 1 1 92 0 a46 46 0 1 1 -92 0 Z M11 50 a39 39 0 1 0 78 0 a39 39 0 1 0 -78 0 Z M80.00 50.00 L65.00 75.98 L35.00 75.98 L20.00 50.00 L35.00 24.02 L65.00 24.02 Z M62.99 42.50 L50.00 35.00 L37.01 42.50 L37.01 57.50 L50.00 65.00 L62.99 57.50 Z " fill-rule="nonzero"/>
  </g>
- <g id="Black-M" transform="matrix(1.85 0 0 1.85 2739.6 1004.745)">
-  <path d="M28 8 H72 a24 24 0 0 1 24 24 V68 a24 24 0 0 1 -24 24 H28 a24 24 0 0 1 -24 -24 V32 a24 24 0 0 1 24 -24 Z M29 17 a16 16 0 0 0 -16 16 V67 a16 16 0 0 0 16 16 H71 a16 16 0 0 0 16 -16 V33 a16 16 0 0 0 -16 -16 Z M24 52 a26 26 0 1 1 52 0 a26 26 0 1 1 -52 0 Z M33 52 a17 17 0 1 0 34 0 a17 17 0 1 0 -34 0 Z M30 1 H44 a6 6 0 0 1 6 6 V9 a6 6 0 0 1 -6 6 H30 a6 6 0 0 1 -6 -6 V7 a6 6 0 0 1 6 -6 Z M41.5 52 a8.5 8.5 0 1 1 17.0 0 a8.5 8.5 0 1 1 -17.0 0 Z M71.4 28 a5.6 5.6 0 1 1 11.2 0 a5.6 5.6 0 1 1 -11.2 0 Z " fill-rule="nonzero"/>
+ <g id="Black-M" transform="matrix(1.6 0 0 1.6 2740.6 1010.77)">
+  <path d="M4 50 a46 46 0 1 1 92 0 a46 46 0 1 1 -92 0 Z M11 50 a39 39 0 1 0 78 0 a39 39 0 1 0 -78 0 Z M80.00 50.00 L65.00 75.98 L35.00 75.98 L20.00 50.00 L35.00 24.02 L65.00 24.02 Z M62.99 42.50 L50.00 35.00 L37.01 42.50 L37.01 57.50 L50.00 65.00 L62.99 57.50 Z " fill-rule="nonzero"/>
  </g>
- <g id="Black-L" transform="matrix(1.85 0 0 1.85 2739.6 1434.745)">
-  <path d="M28 8 H72 a24 24 0 0 1 24 24 V68 a24 24 0 0 1 -24 24 H28 a24 24 0 0 1 -24 -24 V32 a24 24 0 0 1 24 -24 Z M29 17 a16 16 0 0 0 -16 16 V67 a16 16 0 0 0 16 16 H71 a16 16 0 0 0 16 -16 V33 a16 16 0 0 0 -16 -16 Z M24 52 a26 26 0 1 1 52 0 a26 26 0 1 1 -52 0 Z M33 52 a17 17 0 1 0 34 0 a17 17 0 1 0 -34 0 Z M30 1 H44 a6 6 0 0 1 6 6 V9 a6 6 0 0 1 -6 6 H30 a6 6 0 0 1 -6 -6 V7 a6 6 0 0 1 6 -6 Z M41.5 52 a8.5 8.5 0 1 1 17.0 0 a8.5 8.5 0 1 1 -17.0 0 Z M71.4 28 a5.6 5.6 0 1 1 11.2 0 a5.6 5.6 0 1 1 -11.2 0 Z " fill-rule="nonzero"/>
+ <g id="Black-L" transform="matrix(1.6 0 0 1.6 2740.6 1440.77)">
+  <path d="M4 50 a46 46 0 1 1 92 0 a46 46 0 1 1 -92 0 Z M11 50 a39 39 0 1 0 78 0 a39 39 0 1 0 -78 0 Z M80.00 50.00 L65.00 75.98 L35.00 75.98 L20.00 50.00 L35.00 24.02 L65.00 24.02 Z M62.99 42.50 L50.00 35.00 L37.01 42.50 L37.01 57.50 L50.00 65.00 L62.99 57.50 Z " fill-rule="nonzero"/>
  </g>
 </g>
 </svg>
