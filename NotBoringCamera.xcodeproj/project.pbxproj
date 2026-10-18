@@ -15,6 +15,7 @@
 		48151C230A37731B4F6E2B2C /* Styles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 776CC998FD73D5EB73936F99 /* Styles.swift */; };
 		53CE0239597F0399143C527F /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCE302B701320F9B68596B82 /* Theme.swift */; };
 		547EF5711FC909273A100101 /* CaptureIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41855A947E9008B0E6616AB4 /* CaptureIntent.swift */; };
+		56CCB9238265A1A6928A20B1 /* MoreWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79B778D2EFF789FA28088ECE /* MoreWidgets.swift */; };
 		58ED5F5080349F9B37A97A1E /* PreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04B1C49C2004FDF28B92F812 /* PreviewView.swift */; };
 		59B9DA202FD97FD8917C509F /* CameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 896AB05AE5D4DC2E0F2B8E53 /* CameraView.swift */; };
 		5A92108CEA877EB70DE54711 /* Intents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44372BE70AE3A9CF7F351255 /* Intents.swift */; };
@@ -22,6 +23,8 @@
 		5E6E0F6CDAB35D6D7E7DC119 /* Intents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44372BE70AE3A9CF7F351255 /* Intents.swift */; };
 		67491A439A19D1D42748A1E1 /* CameraModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCCE10A04C8F9307BE3FF218 /* CameraModel.swift */; };
 		67C178C1ADE841BEA39A0234 /* NotBoringLockedCapture.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 09472209BF7451D388D0F42E /* NotBoringLockedCapture.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		698C39950EA8427FC8D0B5BA /* RollNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8428FAB9BECA7714F2C6BEB3 /* RollNotifications.swift */; };
+		6F85D01F2CFA545CA858CA24 /* ContactSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E59F0BF76B2032FE6B97EEB /* ContactSheet.swift */; };
 		8B541C2478D767CBE04F71A7 /* Achievements.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6D9A08F605BDD3E1FAA456D /* Achievements.swift */; };
 		95D7D7829F206112558CF025 /* PhotoLabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ECFCDC7117B9D464075F59A /* PhotoLabView.swift */; };
 		981548D53D2D1F8CB391DA60 /* filter-sample.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 08A570B5F659605915BD9FCD /* filter-sample.jpg */; };
@@ -34,6 +37,7 @@
 		D56D71AE239DB597CF707CD3 /* Controls.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE84DBE6D9B5D161BF5CB8F9 /* Controls.swift */; };
 		D8235DB991FEA74A822A7444 /* NotBoringCameraApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C69E82211BBFD752AC3F6A /* NotBoringCameraApp.swift */; };
 		EF9C363BAEEA87501930E250 /* NotBoringWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = DA0EB8B7D338033EE0D8E946 /* NotBoringWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		F31416568FF63CD6C6732385 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BE398015B7AEFECD36F9FCD3 /* Assets.xcassets */; };
 		F915E7D8289C2F91DEDE24A9 /* Roll.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1702F0D65BDEAB7CEAED0C32 /* Roll.swift */; };
 		FFC55B5C16F6FBC4D2B2EB5B /* AppIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB5732D948E023C4E7141E11 /* AppIntegration.swift */; };
 /* End PBXBuildFile section */
@@ -84,8 +88,11 @@
 		44372BE70AE3A9CF7F351255 /* Intents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Intents.swift; sourceTree = "<group>"; };
 		50CAB7735085446EE1F8A67D /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		54B4E567DB62F7EB5D6B16D2 /* Widgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Widgets.entitlements; sourceTree = "<group>"; };
+		5E59F0BF76B2032FE6B97EEB /* ContactSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactSheet.swift; sourceTree = "<group>"; };
 		6D78982F7C3FDB319CE922DC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		776CC998FD73D5EB73936F99 /* Styles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Styles.swift; sourceTree = "<group>"; };
+		79B778D2EFF789FA28088ECE /* MoreWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoreWidgets.swift; sourceTree = "<group>"; };
+		8428FAB9BECA7714F2C6BEB3 /* RollNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RollNotifications.swift; sourceTree = "<group>"; };
 		896AB05AE5D4DC2E0F2B8E53 /* CameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraView.swift; sourceTree = "<group>"; };
 		8CB427D762584DEBCF1F2824 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		98E2F365AB65F2CD40B1CC65 /* NotBoringCamera.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = NotBoringCamera.entitlements; sourceTree = "<group>"; };
@@ -94,6 +101,7 @@
 		BA2A49FB31318C6EA043928E /* Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings.swift; sourceTree = "<group>"; };
 		BCCE10A04C8F9307BE3FF218 /* CameraModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraModel.swift; sourceTree = "<group>"; };
 		BCE302B701320F9B68596B82 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		BE398015B7AEFECD36F9FCD3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		BE84DBE6D9B5D161BF5CB8F9 /* Controls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Controls.swift; sourceTree = "<group>"; };
 		D6C69E82211BBFD752AC3F6A /* NotBoringCameraApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotBoringCameraApp.swift; sourceTree = "<group>"; };
 		D6D9A08F605BDD3E1FAA456D /* Achievements.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Achievements.swift; sourceTree = "<group>"; };
@@ -117,7 +125,9 @@
 		4691B9774CFB28F0395FD71F /* Widgets */ = {
 			isa = PBXGroup;
 			children = (
+				BE398015B7AEFECD36F9FCD3 /* Assets.xcassets */,
 				EA116E3704AE634F3BED9C90 /* Info.plist */,
+				79B778D2EFF789FA28088ECE /* MoreWidgets.swift */,
 				F1CA307ED100EC2560AC175F /* NotBoringWidgets.swift */,
 				54B4E567DB62F7EB5D6B16D2 /* Widgets.entitlements */,
 			);
@@ -156,7 +166,9 @@
 			isa = PBXGroup;
 			children = (
 				D6D9A08F605BDD3E1FAA456D /* Achievements.swift */,
+				5E59F0BF76B2032FE6B97EEB /* ContactSheet.swift */,
 				1702F0D65BDEAB7CEAED0C32 /* Roll.swift */,
+				8428FAB9BECA7714F2C6BEB3 /* RollNotifications.swift */,
 				BA2A49FB31318C6EA043928E /* Settings.swift */,
 				776CC998FD73D5EB73936F99 /* Styles.swift */,
 				BCE302B701320F9B68596B82 /* Theme.swift */,
@@ -245,6 +257,7 @@
 			buildConfigurationList = 6CB7478557228E4F42C6DA8F /* Build configuration list for PBXNativeTarget "NotBoringWidgets" */;
 			buildPhases = (
 				01E7CAA69FFE58D9C209D980 /* Sources */,
+				C0968374BDC59992CBF52AF8 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -332,6 +345,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C0968374BDC59992CBF52AF8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F31416568FF63CD6C6732385 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -341,6 +362,7 @@
 			files = (
 				CF7E2FA56A25D07B43F1F0BA /* CaptureIntent.swift in Sources */,
 				5A92108CEA877EB70DE54711 /* Intents.swift in Sources */,
+				56CCB9238265A1A6928A20B1 /* MoreWidgets.swift in Sources */,
 				0917BDA227EBC7BBA4936665 /* NotBoringWidgets.swift in Sources */,
 				386D2DE6FE37AA08C5045751 /* SharedStore.swift in Sources */,
 			);
@@ -356,12 +378,14 @@
 				59B9DA202FD97FD8917C509F /* CameraView.swift in Sources */,
 				ABD69503401AC7DA581E5B2E /* CaptureIntent.swift in Sources */,
 				1C1C5B6A896628061ED4864A /* ColorwayShare.swift in Sources */,
+				6F85D01F2CFA545CA858CA24 /* ContactSheet.swift in Sources */,
 				D56D71AE239DB597CF707CD3 /* Controls.swift in Sources */,
 				5E6E0F6CDAB35D6D7E7DC119 /* Intents.swift in Sources */,
 				D8235DB991FEA74A822A7444 /* NotBoringCameraApp.swift in Sources */,
 				95D7D7829F206112558CF025 /* PhotoLabView.swift in Sources */,
 				58ED5F5080349F9B37A97A1E /* PreviewView.swift in Sources */,
 				F915E7D8289C2F91DEDE24A9 /* Roll.swift in Sources */,
+				698C39950EA8427FC8D0B5BA /* RollNotifications.swift in Sources */,
 				AEBF0CA75EA5CC4F87B055FC /* Settings.swift in Sources */,
 				CBA84BA782D53F6A8DA5DBE7 /* SettingsView.swift in Sources */,
 				5ACCC8E51917CB52D98159B7 /* SharedStore.swift in Sources */,
