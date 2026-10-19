@@ -104,7 +104,9 @@ struct LaunchWidget: Widget {
 struct OpenCameraControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: "com.devin.camera.notboring.open") {
-            ControlWidgetButton(action: OpenCameraIntent()) { Label("!Camera", image: "BangLens") }
+            // Opens the app through its own URL scheme (registered in the app's Info.plist): the supported way for a control to launch
+            // the app. The custom open-app intent used before only brought up the Lock Screen unlock and then landed on the Home Screen.
+            ControlWidgetButton(action: OpenURLIntent(URL(string: "notboringcamera://open")!)) { Label("!Camera", image: "BangLens") }
         }
         .displayName("!Camera")
         .description("Open !Camera.")
