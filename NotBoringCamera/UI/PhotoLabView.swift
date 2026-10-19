@@ -11,6 +11,8 @@ struct PhotoLabView: View {
 
     enum LabTab { case adjust, crop, style }
 
+    @State private var placeholder: UIImage?      // the tapped thumbnail, shown in the card until the full photo is ready
+    @State private var lastPickedID: String?      // so the library returns to where you were
     @State private var assets: PHFetchResult<PHAsset>?
     @State private var selectedID: String?
     @State private var selectedDate: Date?
@@ -39,33 +41,38 @@ struct PhotoLabView: View {
     private var ink: Color { cw.ink }
 
     /// Step 1 is the library; tapping a photo opens step 2, which is only that photo and its editing tools.
-    private var editing: Bool { source != nil || loadingPhoto }
+    /// Both screens stay in place and cross-fade (opacity + a slight zoom) so they genuinely overlap, with no empty frame between.
+    @State private var editorOpen = false
+    private var editing: Bool { editorOpen }
 
     var body: some View {
         ZStack {
             cw.bodyColor.ignoresSafeArea()
-            if editing {
-                // The photo, tabs and Save stay put; only the controls scroll, so you never scroll away from the picture.
-                VStack(alignment: .leading, spacing: 16) {
-                    header(showBack: true)
-                    preview
-                    ScrollView(showsIndicators: false) {
-                        controls.padding(.top, 4).padding(.bottom, 14)
-                    }
-                    VStack(spacing: 14) { tabs; saveButton }
-                }
-                .padding(.horizontal, 22).padding(.top, 14).padding(.bottom, 10)
-                .transition(.opacity)
-            } else {
-                VStack(alignment: .leading, spacing: 16) {
-                    header(showBack: false)
+            VStack(alignment: .leading, spacing: 16) {
+                // One header for both steps: the title never moves or doubles; only the back arrow comes and goes.
+                header(showBack: editing)
+                ZStack {
+                    // Step 1: the library. Fades out quickly, with a slight zoom.
                     library
+                        .opacity(editing ? 0 : 1).scaleEffect(editing ? 1.05 : 1)
+                        .allowsHitTesting(!editing).accessibilityHidden(editing)
+                        .animation(.easeOut(duration: 0.24), value: editing)
+                    // Step 2: one photo and its tools. Fades in a beat later. The photo, tabs and Save stay put; only the controls scroll.
+                    VStack(alignment: .leading, spacing: 16) {
+                        preview
+                        ScrollView(showsIndicators: false) {
+                            controls.padding(.top, 4).padding(.bottom, 14)
+                        }
+                        VStack(spacing: 14) { tabs; saveButton }
+                    }
+                    .padding(.bottom, 10)
+                    .opacity(editing ? 1 : 0).scaleEffect(editing ? 1 : 0.97)
+                    .allowsHitTesting(editing).accessibilityHidden(!editing)
+                    .animation(.smooth(duration: 0.36).delay(editing ? 0.06 : 0), value: editing)
                 }
-                .padding(.horizontal, 22).padding(.top, 14)
-                .transition(.opacity)
             }
+            .padding(.horizontal, 22).padding(.top, 14)
         }
-        .animation(.easeInOut(duration: 0.25), value: editing)
         .preferredColorScheme(cw.isDarkBody ? .dark : .light)
         .task { await loadLibrary() }
         .onChange(of: [exposure, temp, tint, highlights, shadows, strength, grain]) { _, _ in render() }
@@ -85,6 +92,7 @@ struct PhotoLabView: View {
                         .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
                 }
                 .accessibilityLabel("Back to photos")
+                .transition(.opacity.combined(with: .move(edge: .leading)))
             }
             Text("Photo Lab").font(.system(size: 38, weight: .black, design: .rounded)).foregroundStyle(ink).lineLimit(1).minimumScaleFactor(0.7)
             Spacer()
@@ -95,10 +103,16 @@ struct PhotoLabView: View {
             }
             .accessibilityLabel("Close")
         }
+        .animation(.smooth(duration: 0.3), value: showBack)
     }
 
     private func closeEditor() {
-        selectedID = nil; selectedDate = nil; source = nil; rendered = nil; loadingPhoto = false; saved = false
+        withAnimation(.smooth(duration: 0.38)) { editorOpen = false }
+        // Clear the photo only after the fade, so the screen doesn't change underneath while it fades out.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            guard !editorOpen else { return }
+            selectedID = nil; selectedDate = nil; source = nil; rendered = nil; loadingPhoto = false; saved = false; placeholder = nil
+        }
     }
 
     // MARK: Preview
@@ -120,12 +134,13 @@ struct PhotoLabView: View {
                     })
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .onLongPressGesture(minimumDuration: 0.15, maximumDistance: 40, pressing: { comparing = $0 }, perform: {})
+            } else if let placeholder {
+                // The thumbnail you tapped, already in the card; the full photo fades in over it.
+                Image(uiImage: placeholder).resizable().scaledToFit()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .overlay(alignment: .bottom) { ProgressView().tint(.white).padding(.bottom, 12) }
             } else {
-                VStack(spacing: 8) {
-                    if loadingPhoto { ProgressView().tint(.white) } else { Image(systemName: "photo.on.rectangle.angled").font(.system(size: 30)).foregroundStyle(.white.opacity(0.6)) }
-                    Text("Loading…").font(.system(size: 14, weight: .heavy, design: .rounded)).foregroundStyle(.white.opacity(0.7))
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                ProgressView().tint(.white).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             if source != nil {
                 Text(chipText).font(.system(size: 11, weight: .semibold, design: .monospaced)).foregroundStyle(.white)
@@ -156,18 +171,22 @@ struct PhotoLabView: View {
                     Button("Open Settings") { if let u = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(u) } }.buttonStyle(.borderedProminent).tint(cw.dialColor)
                 }.frame(maxWidth: .infinity).padding(.vertical, 40)
             } else if let assets {
-                ScrollView(showsIndicators: false) {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
-                        ForEach(0..<assets.count, id: \.self) { i in
-                            let a = assets.object(at: i)
-                            Color.clear.aspectRatio(1, contentMode: .fit)
-                                .overlay(LabThumb(asset: a))
-                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                                .contentShape(Rectangle())
-                                .onTapGesture { pick(a); Feedback.tick() }
+                ScrollViewReader { proxy in
+                    ScrollView(showsIndicators: false) {
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
+                            ForEach(0..<assets.count, id: \.self) { i in
+                                let a = assets.object(at: i)
+                                Color.clear.aspectRatio(1, contentMode: .fit)
+                                    .overlay(LabThumb(asset: a))
+                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                    .contentShape(Rectangle())
+                                    .id(a.localIdentifier)
+                                    .onTapGesture { pick(a); Feedback.tick() }
+                            }
                         }
+                        .padding(.bottom, 30)
                     }
-                    .padding(.bottom, 30)
+                    .onAppear { if let id = lastPickedID { proxy.scrollTo(id, anchor: .center) } }
                 }
             } else {
                 ProgressView().frame(maxWidth: .infinity).padding(.vertical, 60)
@@ -282,10 +301,16 @@ struct PhotoLabView: View {
     }
 
     private func pick(_ a: PHAsset) {
-        selectedID = a.localIdentifier; selectedDate = a.creationDate; loadingPhoto = true
+        lastPickedID = a.localIdentifier
+        // Grab the already-cached thumbnail synchronously so the card is filled from the first frame of the animation.
+        let t = PHImageRequestOptions(); t.isSynchronous = true; t.deliveryMode = .fastFormat; t.resizeMode = .fast
+        PHImageManager.default().requestImage(for: a, targetSize: CGSize(width: 700, height: 700), contentMode: .aspectFit, options: t) { img, _ in placeholder = img }
+        withAnimation(.smooth(duration: 0.38)) {
+            selectedID = a.localIdentifier; selectedDate = a.creationDate; loadingPhoto = true; editorOpen = true
+        }
         let o = PHImageRequestOptions(); o.isNetworkAccessAllowed = true; o.version = .current
         PHImageManager.default().requestImageDataAndOrientation(for: a, options: o) { data, _, _, _ in
-            DispatchQueue.main.async { loadingPhoto = false; if let data { setSource(data) } }
+            DispatchQueue.main.async { withAnimation(.easeOut(duration: 0.3)) { loadingPhoto = false; if let data { setSource(data) } } }
         }
     }
 
