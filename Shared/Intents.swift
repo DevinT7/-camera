@@ -4,6 +4,6 @@ import AppIntents
 struct OpenCameraIntent: AppIntent {
     static let title: LocalizedStringResource = "Open !Camera"
     static let description = IntentDescription("Opens !Camera ready to shoot.")
-    static let openAppWhenRun = true
+    static var openAppWhenRun: Bool { true }
     func perform() async throws -> some IntentResult { .result() }
 }
