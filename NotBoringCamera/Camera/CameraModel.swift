@@ -114,12 +114,30 @@ final class CameraModel: NSObject, ObservableObject {
             if let i = evLadder.firstIndex(where: { abs(Double($0) - settings.lastEV) < 0.01 }) { evIndex = i }
         }
         pushRenderState()
+        // The round last-photo button follows the library: a deleted photo drops out of it.
+        PHPhotoLibrary.shared().register(self)
+        NotificationCenter.default.addObserver(forName: .photoLogChanged, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.refreshLastImage() }
+        }
+    }
+
+    /// Thumbnail of the newest photo this app made that still exists in the library (nil if none).
+    @MainActor func refreshLastImage() {
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        guard status == .authorized || status == .limited else { return }
+        PhotoLog.shared.backfillIfNeeded()
+        guard let asset = PhotoLog.shared.existingAssets().first?.1 else { lastImage = nil; return }
+        let o = PHImageRequestOptions(); o.deliveryMode = .opportunistic; o.resizeMode = .fast; o.isNetworkAccessAllowed = true
+        PHImageManager.default().requestImage(for: asset, targetSize: CGSize(width: 180, height: 180), contentMode: .aspectFill, options: o) { img, _ in
+            DispatchQueue.main.async { if let img { self.lastImage = img } }
+        }
     }
 
     func setViewfinderSize(_ s: CGSize) { layerProbe.frame = CGRect(origin: .zero, size: s) }
 
     // MARK: Lifecycle
     func start() {
+        Task { @MainActor in self.refreshLastImage() }
         startMotion()
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized: configureIfNeeded()
@@ -636,6 +654,12 @@ final class CameraModel: NSObject, ObservableObject {
             if ok, let id = box.id { DispatchQueue.main.async { PhotoLog.shared.add(id: id, date: date) } }
             completion?(ok)
         })
+    }
+}
+
+extension CameraModel: PHPhotoLibraryChangeObserver {
+    nonisolated func photoLibraryDidChange(_ changeInstance: PHChange) {
+        Task { @MainActor in self.refreshLastImage() }
     }
 }
 

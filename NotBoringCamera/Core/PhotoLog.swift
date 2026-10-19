@@ -1,6 +1,8 @@
 import Foundation
 import Photos
 
+extension Notification.Name { static let photoLogChanged = Notification.Name("photoLogChanged") }
+
 /// The app's own record of the photos it made, so the Photo Book keeps working even if "Save to !Camera album" is off.
 struct LoggedPhoto: Codable, Identifiable, Hashable {
     var id: String          // PHAsset local identifier
@@ -25,6 +27,7 @@ final class PhotoLog: ObservableObject {
         guard !items.contains(where: { $0.id == id }) else { return }
         items.append(LoggedPhoto(id: id, date: date))
         persist()
+        NotificationCenter.default.post(name: .photoLogChanged, object: nil)
     }
 
     /// One-time: photos taken before the log existed live in the "!Camera" album; add them.
