@@ -38,21 +38,34 @@ struct PhotoLabView: View {
     private var cw: Colorway { s.colorway }
     private var ink: Color { cw.ink }
 
+    /// Step 1 is the library; tapping a photo opens step 2, which is only that photo and its editing tools.
+    private var editing: Bool { source != nil || loadingPhoto }
+
     var body: some View {
         ZStack {
             cw.bodyColor.ignoresSafeArea()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    header
-                    preview
-                    library
-                    controls
-                    tabs
-                    saveButton
+            if editing {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        header(showBack: true)
+                        preview
+                        controls
+                        tabs
+                        saveButton
+                    }
+                    .padding(.horizontal, 22).padding(.top, 14).padding(.bottom, 34)
                 }
-                .padding(.horizontal, 22).padding(.top, 14).padding(.bottom, 34)
+                .transition(.opacity)
+            } else {
+                VStack(alignment: .leading, spacing: 16) {
+                    header(showBack: false)
+                    library
+                }
+                .padding(.horizontal, 22).padding(.top, 14)
+                .transition(.opacity)
             }
         }
+        .animation(.easeInOut(duration: 0.25), value: editing)
         .preferredColorScheme(cw.isDarkBody ? .dark : .light)
         .task { await loadLibrary() }
         .onChange(of: [exposure, temp, tint, highlights, shadows, strength, grain]) { _, _ in render() }
@@ -63,12 +76,17 @@ struct PhotoLabView: View {
     }
 
     // MARK: Header
-    private var header: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("MAKE IT YOURS").font(.system(size: 12, weight: .medium, design: .monospaced)).tracking(1).foregroundStyle(ink.opacity(0.6))
-                Text("Photo Lab.").font(.system(size: 42, weight: .black, design: .rounded)).foregroundStyle(ink)
+    private func header(showBack: Bool) -> some View {
+        HStack(spacing: 12) {
+            if showBack {
+                Button { closeEditor(); Feedback.toggle() } label: {
+                    Image(systemName: "chevron.left").font(.system(size: 18, weight: .bold)).foregroundStyle(ink)
+                        .frame(width: 46, height: 46).background(cw.panelColor.opacity(0.55), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
+                }
+                .accessibilityLabel("Back to photos")
             }
+            Text("Photo Lab").font(.system(size: 38, weight: .black, design: .rounded)).foregroundStyle(ink).lineLimit(1).minimumScaleFactor(0.7)
             Spacer()
             Button { dismiss() } label: {
                 Image(systemName: "xmark").font(.system(size: 18, weight: .bold)).foregroundStyle(ink)
@@ -77,6 +95,10 @@ struct PhotoLabView: View {
             }
             .accessibilityLabel("Close")
         }
+    }
+
+    private func closeEditor() {
+        selectedID = nil; selectedDate = nil; source = nil; rendered = nil; loadingPhoto = false; saved = false
     }
 
     // MARK: Preview
@@ -101,7 +123,7 @@ struct PhotoLabView: View {
             } else {
                 VStack(spacing: 8) {
                     if loadingPhoto { ProgressView().tint(.white) } else { Image(systemName: "photo.on.rectangle.angled").font(.system(size: 30)).foregroundStyle(.white.opacity(0.6)) }
-                    Text(loadingPhoto ? "Loading…" : "Pick a photo below").font(.system(size: 14, weight: .heavy, design: .rounded)).foregroundStyle(.white.opacity(0.7))
+                    Text("Loading…").font(.system(size: 14, weight: .heavy, design: .rounded)).foregroundStyle(.white.opacity(0.7))
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -114,7 +136,7 @@ struct PhotoLabView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom).padding(.bottom, 10).allowsHitTesting(false)
             }
         }
-        .frame(height: 330)
+        .frame(height: 430)
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
     }
 
@@ -126,36 +148,29 @@ struct PhotoLabView: View {
 
     // MARK: Library
     private var library: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("ALL PHOTOS").font(.system(size: 12, weight: .medium, design: .monospaced)).tracking(0.6)
-                Spacer()
-                Text("\(assets?.count ?? 0) PHOTOS").font(.system(size: 12, weight: .medium, design: .monospaced)).opacity(0.65)
-            }
-            .foregroundStyle(ink)
+        VStack(alignment: .leading, spacing: 12) {
+            Text("\(assets?.count ?? 0) PHOTOS").font(.system(size: 12, weight: .medium, design: .monospaced)).tracking(0.6).foregroundStyle(ink.opacity(0.6))
             if denied {
-                VStack(spacing: 8) {
+                VStack(spacing: 10) {
                     Text("Allow photo access to browse your library here.").font(.footnote).foregroundStyle(ink.opacity(0.7))
                     Button("Open Settings") { if let u = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(u) } }.buttonStyle(.borderedProminent).tint(cw.dialColor)
-                }.frame(maxWidth: .infinity).padding(.vertical, 20)
+                }.frame(maxWidth: .infinity).padding(.vertical, 40)
             } else if let assets {
-                ScrollView {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                ScrollView(showsIndicators: false) {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
                         ForEach(0..<assets.count, id: \.self) { i in
                             let a = assets.object(at: i)
-                            Color.clear.aspectRatio(1.45, contentMode: .fit)
+                            Color.clear.aspectRatio(1, contentMode: .fit)
                                 .overlay(LabThumb(asset: a))
                                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(selectedID == a.localIdentifier ? cw.dialColor : ink.opacity(0.12), lineWidth: selectedID == a.localIdentifier ? 3 : 1))
                                 .contentShape(Rectangle())
                                 .onTapGesture { pick(a); Feedback.tick() }
                         }
                     }
-                    .padding(2)
+                    .padding(.bottom, 30)
                 }
-                .frame(height: 180)
             } else {
-                ProgressView().frame(maxWidth: .infinity).padding(.vertical, 30)
+                ProgressView().frame(maxWidth: .infinity).padding(.vertical, 60)
             }
         }
     }
@@ -264,7 +279,6 @@ struct PhotoLabView: View {
         let o = PHFetchOptions()
         o.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         assets = PHAsset.fetchAssets(with: .image, options: o)
-        if source == nil, let first = assets?.firstObject { pick(first) }   // open with the newest photo loaded
     }
 
     private func pick(_ a: PHAsset) {
