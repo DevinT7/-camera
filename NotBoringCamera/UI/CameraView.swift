@@ -17,6 +17,7 @@ struct CameraView: View {
     @State private var zoomReadout = false
     @State private var zoomReadoutToken = 0
     @State private var zoomDragBase: CGFloat?
+    @State private var shutterBlink = false
     @Environment(\.scenePhase) private var scenePhase
 
     private var cw: Colorway { settings.colorway }
@@ -81,6 +82,11 @@ struct CameraView: View {
         .onChange(of: settings.keepAwake) { _, v in UIApplication.shared.isIdleTimerDisabled = v }
         .onChange(of: scenePhase) { _, p in if p == .active { model.start(); RollStore.shared.developDue() } else { model.stop() } }
         .onChange(of: useNativePreview, initial: true) { _, v in model.nativePreviewActive = v }
+        .onChange(of: model.capturing) { _, on in
+            guard on else { return }
+            shutterBlink = true
+            withAnimation(.easeOut(duration: 0.22).delay(0.05)) { shutterBlink = false }
+        }
         .onChange(of: settings.zebra) { _, _ in model.pushRenderState() }
         .onChange(of: settings.focusPeaking) { _, _ in model.pushRenderState() }
         .onChange(of: settings.histogram) { _, _ in model.pushRenderState() }
@@ -269,6 +275,7 @@ struct CameraView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top).padding(.top, 12 + vfTop)
                 }
                 if settings.filmRoll && model.captureMode == .photo { rollBadge.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: fullScreen ? .topLeading : .topTrailing).padding(12).padding(.top, vfTop) }
+                Color.black.opacity(shutterBlink ? 0.45 : 0).allowsHitTesting(false)
                 StylePickerOverlay(styles: model.styles, index: $model.styleIndex, accent: cw.accentColor, visible: styleToast,
                                    topInset: fullScreen ? safeInsets.top : 0, bottomInset: fullScreen ? safeInsets.bottom : 0)
             }

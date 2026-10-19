@@ -14,6 +14,8 @@ struct PhotoLabView: View {
     @State private var placeholder: UIImage?      // the tapped thumbnail, shown in the card until the full photo is ready
     @State private var lastPickedID: String?      // so the library returns to where you were
     @State private var assets: PHFetchResult<PHAsset>?
+    @State private var selecting = false
+    @State private var selection = Set<String>()
     @State private var selectedID: String?
     @State private var selectedDate: Date?
     @State private var loadingPhoto = false
@@ -143,6 +145,19 @@ struct PhotoLabView: View {
                 ProgressView().tint(.white).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             if source != nil {
+                Button {
+                    if let id = selectedID {
+                        let r = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil)
+                        if let a = r.firstObject { delete([a]) { closeEditor() } }
+                    }
+                } label: {
+                    Image(systemName: "trash").font(.system(size: 16, weight: .bold)).foregroundStyle(.white)
+                        .frame(width: 40, height: 40).background(Color.black.opacity(0.55), in: Circle())
+                }
+                .accessibilityLabel("Delete photo")
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing).padding(12)
+            }
+            if source != nil {
                 Text(chipText).font(.system(size: 11, weight: .semibold, design: .monospaced)).foregroundStyle(.white)
                     .padding(.horizontal, 12).padding(.vertical, 8).background(Color.black.opacity(0.62), in: Capsule()).padding(14)
             }
@@ -164,7 +179,17 @@ struct PhotoLabView: View {
     // MARK: Library
     private var library: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("\(assets?.count ?? 0) PHOTOS").font(.system(size: 12, weight: .medium, design: .monospaced)).tracking(0.6).foregroundStyle(ink.opacity(0.6))
+            HStack {
+                Text("\(assets?.count ?? 0) PHOTOS").font(.system(size: 12, weight: .medium, design: .monospaced)).tracking(0.6).foregroundStyle(ink.opacity(0.6))
+                Spacer()
+                if assets != nil, (assets?.count ?? 0) > 0 {
+                    Button(selecting ? "CANCEL" : "SELECT") {
+                        withAnimation(.smooth(duration: 0.2)) { selecting.toggle(); selection = [] }
+                        Feedback.toggle()
+                    }
+                    .font(.system(size: 12, weight: .heavy, design: .monospaced)).tracking(0.6).foregroundStyle(cw.dialColor)
+                }
+            }
             if denied {
                 VStack(spacing: 10) {
                     Text("Allow photo access to browse your library here.").font(.footnote).foregroundStyle(ink.opacity(0.7))
@@ -181,12 +206,48 @@ struct PhotoLabView: View {
                                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                                     .contentShape(Rectangle())
                                     .id(a.localIdentifier)
-                                    .onTapGesture { pick(a); Feedback.tick() }
+                                    .overlay(alignment: .topTrailing) {
+                                        if selecting {
+                                            let on = selection.contains(a.localIdentifier)
+                                            ZStack {
+                                                Circle().fill(on ? cw.dialColor : Color.black.opacity(0.35)).frame(width: 24, height: 24)
+                                                Circle().strokeBorder(.white, lineWidth: 1.5).frame(width: 24, height: 24)
+                                                if on { Image(systemName: "checkmark").font(.system(size: 12, weight: .heavy)).foregroundStyle(.white) }
+                                            }.padding(6)
+                                        }
+                                    }
+                                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(cw.dialColor, lineWidth: selecting && selection.contains(a.localIdentifier) ? 3 : 0))
+                                    .onTapGesture {
+                                        if selecting {
+                                            if selection.contains(a.localIdentifier) { selection.remove(a.localIdentifier) } else { selection.insert(a.localIdentifier) }
+                                            Feedback.tick()
+                                        } else { pick(a); Feedback.tick() }
+                                    }
+                                    .contextMenu {
+                                        Button(role: .destructive) { delete([a]) } label: { Label("Delete", systemImage: "trash") }
+                                    }
                             }
                         }
                         .padding(.bottom, 30)
                     }
                     .onAppear { if let id = lastPickedID { proxy.scrollTo(id, anchor: .center) } }
+                }
+                .overlay(alignment: .bottom) {
+                    if selecting && !selection.isEmpty {
+                        Button {
+                            let ids = selection
+                            var list: [PHAsset] = []
+                            assets.enumerateObjects { a, _, _ in if ids.contains(a.localIdentifier) { list.append(a) } }
+                            delete(list)
+                        } label: {
+                            Label("Delete \(selection.count) \(selection.count == 1 ? "Photo" : "Photos")", systemImage: "trash")
+                                .font(.system(size: 17, weight: .black, design: .rounded)).foregroundStyle(.white)
+                                .frame(maxWidth: .infinity).padding(.vertical, 16)
+                                .background(Color(red: 1, green: 0.23, blue: 0.19), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                                .shadow(color: .black.opacity(0.2), radius: 6, y: 3)
+                        }
+                        .buttonStyle(.plain).padding(.bottom, 8).transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
                 }
             } else {
                 ProgressView().frame(maxWidth: .infinity).padding(.vertical, 60)
@@ -292,12 +353,30 @@ struct PhotoLabView: View {
     }
 
     // MARK: Library + photo loading
-    private func loadLibrary() async {
-        let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
-        guard status == .authorized || status == .limited else { denied = true; return }
+    private func fetchAssets() {
         let o = PHFetchOptions()
         o.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         assets = PHAsset.fetchAssets(with: .image, options: o)
+    }
+
+    /// Removes photos from the iPhone's library. iOS shows its own "Delete N Photos?" confirmation first; nothing happens if you cancel.
+    private func delete(_ list: [PHAsset], then done: @escaping () -> Void = {}) {
+        guard !list.isEmpty else { return }
+        PHPhotoLibrary.shared().performChanges({ PHAssetChangeRequest.deleteAssets(list as NSArray) }) { ok, _ in
+            DispatchQueue.main.async {
+                guard ok else { return }
+                Feedback.thump()
+                withAnimation(.smooth(duration: 0.25)) { selection = []; selecting = false }
+                fetchAssets()
+                done()
+            }
+        }
+    }
+
+    private func loadLibrary() async {
+        let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+        guard status == .authorized || status == .limited else { denied = true; return }
+        fetchAssets()
     }
 
     private func pick(_ a: PHAsset) {

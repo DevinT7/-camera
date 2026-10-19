@@ -59,6 +59,14 @@ enum Feedback {
         guard AppSettings.shared.sounds else { return }
         AudioServicesPlaySystemSound(clickIDs.randomElement()!)
     }
+    /// Finger goes down on the shutter: a crisp, rigid tap, so the press is felt before the photo is taken.
+    private static let pressGenerator = UIImpactFeedbackGenerator(style: .rigid)
+    static func press() {
+        guard AppSettings.shared.haptics else { return }
+        pressGenerator.impactOccurred(intensity: 1)
+        pressGenerator.prepare()
+    }
+
     static func shutter() {
         if AppSettings.shared.sounds { AudioServicesPlaySystemSound(1108) }
         thump()

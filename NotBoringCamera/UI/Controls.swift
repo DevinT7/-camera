@@ -117,11 +117,24 @@ struct ChunkySwitch: View {
     }
 }
 
+/// A ring that expands from the shutter and fades out; recreated (via .id) on every shot.
+private struct ShutterRipple: View {
+    let color: Color
+    @State private var go = false
+    var body: some View {
+        Circle().strokeBorder(color.opacity(0.9), lineWidth: 5)
+            .frame(width: 92, height: 92)
+            .scaleEffect(go ? 1.55 : 0.95).opacity(go ? 0 : 0.85)
+            .onAppear { withAnimation(.easeOut(duration: 0.5)) { go = true } }
+    }
+}
+
 struct ShutterButton: View {
     let colorway: Colorway
     var recording = false
     let action: () -> Void
     @GestureState private var pressed = false
+    @State private var rippleID = 0
     @EnvironmentObject var tiltHolder: TiltBox
 
     var body: some View {
@@ -131,11 +144,15 @@ struct ShutterButton: View {
             Circle().fill(LinearGradient(colors: [colorway.shutterColor, colorway.shutterColor.opacity(0.8)], startPoint: .top, endPoint: .bottom))
                 .frame(width: 92, height: 92)
                 .shadow(color: .black.opacity(pressed ? 0.1 : 0.4), radius: pressed ? 2 : 9, x: tiltHolder.tilt.x * 6, y: pressed ? 1 : tiltHolder.tilt.y * 6 + 3)
-                .scaleEffect(pressed ? 0.93 : 1)
+                .overlay(Circle().fill(.black.opacity(pressed ? 0.22 : 0)))      // darkens while held
+                .scaleEffect(pressed ? 0.86 : 1)
             if recording { RoundedRectangle(cornerRadius: 5).fill(.white).frame(width: 26, height: 26) }
+            // Ring that flashes out from the button each time a photo is taken.
+            ShutterRipple(color: colorway.shutterColor).id(rippleID).allowsHitTesting(false)
         }
         .animation(.spring(response: 0.15, dampingFraction: 0.6), value: pressed)
-        .gesture(DragGesture(minimumDistance: 0).updating($pressed) { _, s, _ in s = true }.onEnded { _ in action() })
+        .onChange(of: pressed) { _, down in if down { Feedback.press() } }
+        .gesture(DragGesture(minimumDistance: 0).updating($pressed) { _, s, _ in s = true }.onEnded { _ in rippleID += 1; action() })
         .accessibilityLabel("Shutter").accessibilityAddTraits(.isButton)
     }
 }

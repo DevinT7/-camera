@@ -137,6 +137,8 @@ final class CameraModel: NSObject, ObservableObject {
 
     // MARK: Lifecycle
     func start() {
+        // iOS silences haptics and system sounds while a capture session is recording unless this is allowed.
+        try? AVAudioSession.sharedInstance().setAllowHapticsAndSystemSoundsDuringRecording(true)
         Task { @MainActor in self.refreshLastImage() }
         startMotion()
         switch AVCaptureDevice.authorizationStatus(for: .video) {
