@@ -45,16 +45,16 @@ struct PhotoLabView: View {
         ZStack {
             cw.bodyColor.ignoresSafeArea()
             if editing {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        header(showBack: true)
-                        preview
-                        controls
-                        tabs
-                        saveButton
+                // The photo, tabs and Save stay put; only the controls scroll, so you never scroll away from the picture.
+                VStack(alignment: .leading, spacing: 16) {
+                    header(showBack: true)
+                    preview
+                    ScrollView(showsIndicators: false) {
+                        controls.padding(.top, 4).padding(.bottom, 14)
                     }
-                    .padding(.horizontal, 22).padding(.top, 14).padding(.bottom, 34)
+                    VStack(spacing: 14) { tabs; saveButton }
                 }
+                .padding(.horizontal, 22).padding(.top, 14).padding(.bottom, 10)
                 .transition(.opacity)
             } else {
                 VStack(alignment: .leading, spacing: 16) {
@@ -136,7 +136,7 @@ struct PhotoLabView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom).padding(.bottom, 10).allowsHitTesting(false)
             }
         }
-        .frame(height: 430)
+        .frame(height: UIScreen.main.bounds.height * 0.34)
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
     }
 
@@ -381,26 +381,8 @@ struct LabSlider: View {
                 Spacer()
                 Text(display(value)).font(.system(size: 12, weight: .semibold, design: .monospaced)).foregroundStyle(cw.dialColor)
             }
-            GeometryReader { g in
-                let r: CGFloat = 15   // knob radius: the track runs from knob-centre to knob-centre so the knob never hangs off the ends
-                let travel = max(g.size.width - 2 * r, 1)
-                let frac = CGFloat((value - range.lowerBound) / (range.upperBound - range.lowerBound))
-                let x = r + min(max(frac, 0), 1) * travel
-                ZStack(alignment: .leading) {
-                    Capsule().fill(cw.panelColor).frame(height: 9)
-                    Capsule().fill(cw.dialColor).frame(width: x, height: 9)
-                    Circle().fill(.white).frame(width: 30, height: 30)
-                        .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
-                        .offset(x: x - 15)
-                }
-                .frame(maxHeight: .infinity)
-                .contentShape(Rectangle())
-                .gesture(DragGesture(minimumDistance: 0).onChanged { v in
-                    let f = min(max((v.location.x - r) / travel, 0), 1)
-                    value = range.lowerBound + Double(f) * (range.upperBound - range.lowerBound)
-                })
-            }
-            .frame(height: 30)
+            // The system slider shares touches with the scrolling page correctly: a vertical drag scrolls, a horizontal one adjusts.
+            Slider(value: $value, in: range).tint(cw.dialColor)
         }
     }
 }
