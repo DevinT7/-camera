@@ -39,6 +39,23 @@ enum Achievements {
         a("share", "Sharing Is Caring", "Share a colorway by QR code.", "qrcode", "FFB020") { $0.qrShares >= 1 },
     ]
 
+    /// Progress toward a locked sticker, for the "Next:" bar. Nil for stickers with no counter (e.g. "use Manual mode").
+    static func progress(for id: String, _ s: ShotStats) -> (current: Int, target: Int, unit: String)? {
+        switch id {
+        case "first": return (min(s.total, 1), 1, "PHOTO")
+        case "ten": return (min(s.total, 10), 10, "PHOTOS")
+        case "hundred": return (min(s.total, 100), 100, "PHOTOS")
+        case "thousand": return (min(s.total, 1000), 1000, "PHOTOS")
+        case "streak3": return (min(s.bestStreak, 3), 3, "DAYS")
+        case "streak7": return (min(s.bestStreak, 7), 7, "DAYS")
+        case "streak14": return (min(s.bestStreak, 14), 14, "DAYS")
+        case "streak30": return (min(s.bestStreak, 30), 30, "DAYS")
+        case "zoom": return (min(Int(s.maxZoom), 8), 8, "X ZOOM")
+        case "stylist": return (min(s.stylesUsed.count, Styles.all.count), Styles.all.count, "STYLES")
+        default: return nil
+        }
+    }
+
     private static func a(_ id: String, _ title: String, _ detail: String, _ symbol: String, _ bg: String, _ check: @escaping (ShotStats) -> Bool) -> Achievement {
         Achievement(id: id, title: title, detail: detail, sticker: Sticker(id: "sticker-" + id, symbol: symbol, title: title, fg: "FFFFFF", bg: bg), check: check)
     }
@@ -121,36 +138,5 @@ struct StickerView: View {
         }
         .frame(width: size, height: size)
         .shadow(color: .black.opacity(locked ? 0 : 0.25), radius: 3, y: 2)
-    }
-}
-
-struct AchievementsView: View {
-    @ObservedObject var store = StatsStore.shared
-    @Environment(\.dismiss) private var dismiss
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack(spacing: 24) {
-                        stat("\(store.stats.total)", "photos"); stat("\(store.stats.streak)", "day streak"); stat("\(store.stats.unlocked.count)/\(Achievements.all.count)", "stickers")
-                    }
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 14)], spacing: 18) {
-                        ForEach(Achievements.all) { a in
-                            let u = store.isUnlocked(a)
-                            VStack(spacing: 6) {
-                                StickerView(sticker: a.sticker, locked: !u, size: 72)
-                                Text(a.title).font(.system(size: 13, weight: .bold, design: .rounded)).multilineTextAlignment(.center)
-                                Text(a.detail).font(.caption2).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                            }.opacity(u ? 1 : 0.7)
-                        }
-                    }
-                }.padding()
-            }
-            .navigationTitle("Achievements").navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-        }
-    }
-    private func stat(_ v: String, _ l: String) -> some View {
-        VStack { Text(v).font(.system(size: 28, weight: .black, design: .rounded)); Text(l).font(.caption).foregroundStyle(.secondary) }
     }
 }

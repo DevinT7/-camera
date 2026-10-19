@@ -613,9 +613,13 @@ final class CameraModel: NSObject, ObservableObject {
 
     private func save(heic: Data, dng: Data?) { Self.saveToLibrary(heic: heic, dng: dng) }
 
-    static func saveToLibrary(heic: Data, dng: Data?, completion: ((Bool) -> Void)? = nil) {
+    private final class IDBox { var id: String? }
+
+    static func saveToLibrary(heic: Data, dng: Data?, date: Date = Date(), completion: ((Bool) -> Void)? = nil) {
+        let box = IDBox()
         PHPhotoLibrary.shared().performChanges({
             let req = PHAssetCreationRequest.forAsset()
+            box.id = req.placeholderForCreatedAsset?.localIdentifier
             req.addResource(with: .photo, data: heic, options: nil)
             if let dng {
                 let o = PHAssetResourceCreationOptions(); o.uniformTypeIdentifier = "com.adobe.raw-image"
@@ -628,7 +632,10 @@ final class CameraModel: NSObject, ObservableObject {
             } else {
                 PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle: "!Camera").addAssets([ph] as NSArray)
             }
-        }, completionHandler: { ok, _ in completion?(ok) })
+        }, completionHandler: { ok, _ in
+            if ok, let id = box.id { DispatchQueue.main.async { PhotoLog.shared.add(id: id, date: date) } }
+            completion?(ok)
+        })
     }
 }
 

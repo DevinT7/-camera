@@ -74,7 +74,7 @@ final class RollStore: ObservableObject {
             var failed = false
             for d in blobs {
                 group.enter()
-                CameraModel.saveToLibrary(heic: d, dng: nil) { ok in if !ok { failed = true }; group.leave() }
+                CameraModel.saveToLibrary(heic: d, dng: nil, date: roll.lastShot ?? Date()) { ok in if !ok { failed = true }; group.leave() }
             }
             group.notify(queue: .main) { [weak self] in
                 guard let self, !failed else { return }
