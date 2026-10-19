@@ -1,4 +1,5 @@
 import SwiftUI
+import AVKit
 import Photos
 import CoreImage
 
@@ -15,6 +16,8 @@ struct PhotoLabView: View {
     @State private var lastPickedID: String?      // so the library returns to where you were
     @State private var assets: PHFetchResult<PHAsset>?
     @State private var selecting = false
+    @State private var videoAsset: PHAsset?        // set while a video is open (no editing tools for videos)
+    @State private var player: AVPlayer?
     @State private var selection = Set<String>()
     @State private var selectedID: String?
     @State private var selectedDate: Date?
@@ -60,12 +63,18 @@ struct PhotoLabView: View {
                         .allowsHitTesting(!editing).accessibilityHidden(editing)
                         .animation(.easeOut(duration: 0.24), value: editing)
                     // Step 2: one photo and its tools. Fades in a beat later. The photo, tabs and Save stay put; only the controls scroll.
-                    VStack(alignment: .leading, spacing: 16) {
-                        preview
-                        ScrollView(showsIndicators: false) {
-                            controls.padding(.top, 4).padding(.bottom, 14)
+                    Group {
+                        if videoAsset != nil {
+                            videoView
+                        } else {
+                            VStack(alignment: .leading, spacing: 16) {
+                                preview
+                                ScrollView(showsIndicators: false) {
+                                    controls.padding(.top, 4).padding(.bottom, 14)
+                                }
+                                VStack(spacing: 14) { tabs; saveButton }
+                            }
                         }
-                        VStack(spacing: 14) { tabs; saveButton }
                     }
                     .padding(.bottom, 10)
                     .opacity(editing ? 1 : 0).scaleEffect(editing ? 1 : 0.97)
@@ -109,11 +118,13 @@ struct PhotoLabView: View {
     }
 
     private func closeEditor() {
+        player?.pause()
         withAnimation(.smooth(duration: 0.38)) { editorOpen = false }
         // Clear the photo only after the fade, so the screen doesn't change underneath while it fades out.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
             guard !editorOpen else { return }
             selectedID = nil; selectedDate = nil; source = nil; rendered = nil; loadingPhoto = false; saved = false; placeholder = nil
+            player?.pause(); player = nil; videoAsset = nil
         }
     }
 
@@ -170,6 +181,55 @@ struct PhotoLabView: View {
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
     }
 
+    // MARK: Video (viewing only)
+    private var videoView: some View {
+        VStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 26, style: .continuous).fill(Color.black)
+                if let player {
+                    VideoPlayer(player: player)
+                } else {
+                    ZStack {
+                        if let placeholder { Image(uiImage: placeholder).resizable().scaledToFit() }
+                        ProgressView().tint(.white)
+                    }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+            .frame(maxHeight: .infinity)
+            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+
+            // Not an overlay: the system video layer draws above SwiftUI content.
+            Button {
+                if let a = videoAsset { delete([a]) { closeEditor() } }
+            } label: {
+                Label("Delete video", systemImage: "trash")
+                    .font(.system(size: 17, weight: .black, design: .rounded)).foregroundStyle(.white)
+                    .frame(maxWidth: .infinity).padding(.vertical, 16)
+                    .background(Color(red: 1, green: 0.23, blue: 0.19), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func openVideo(_ a: PHAsset) {
+        lastPickedID = a.localIdentifier
+        let t = PHImageRequestOptions(); t.isSynchronous = true; t.deliveryMode = .fastFormat; t.resizeMode = .fast
+        PHImageManager.default().requestImage(for: a, targetSize: CGSize(width: 700, height: 700), contentMode: .aspectFit, options: t) { img, _ in placeholder = img }
+        withAnimation(.smooth(duration: 0.38)) {
+            videoAsset = a; selectedID = a.localIdentifier; selectedDate = a.creationDate; editorOpen = true
+        }
+        let o = PHVideoRequestOptions(); o.isNetworkAccessAllowed = true; o.deliveryMode = .automatic
+        PHImageManager.default().requestPlayerItem(forVideo: a, options: o) { item, _ in
+            guard let item else { return }
+            DispatchQueue.main.async {
+                guard videoAsset?.localIdentifier == a.localIdentifier else { return }
+                let p = AVPlayer(playerItem: item)
+                player = p
+                p.play()
+            }
+        }
+    }
+
     private var chipText: String {
         let style = model.styles[min(styleIndex, model.styles.count - 1)].name.uppercased()
         let date = (selectedDate ?? Date()).formatted(.dateTime.month(.abbreviated).day()).uppercased()
@@ -180,7 +240,7 @@ struct PhotoLabView: View {
     private var library: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("\(assets?.count ?? 0) PHOTOS").font(.system(size: 12, weight: .medium, design: .monospaced)).tracking(0.6).foregroundStyle(ink.opacity(0.6))
+                Text(libraryCountText).font(.system(size: 12, weight: .medium, design: .monospaced)).tracking(0.6).foregroundStyle(ink.opacity(0.6))
                 Spacer()
                 if assets != nil, (assets?.count ?? 0) > 0 {
                     Button(selecting ? "CANCEL" : "SELECT") {
@@ -221,7 +281,7 @@ struct PhotoLabView: View {
                                         if selecting {
                                             if selection.contains(a.localIdentifier) { selection.remove(a.localIdentifier) } else { selection.insert(a.localIdentifier) }
                                             Feedback.tick()
-                                        } else { pick(a); Feedback.tick() }
+                                        } else if a.mediaType == .video { openVideo(a); Feedback.tick() } else { pick(a); Feedback.tick() }
                                     }
                                     .contextMenu {
                                         Button(role: .destructive) { delete([a]) } label: { Label("Delete", systemImage: "trash") }
@@ -353,10 +413,18 @@ struct PhotoLabView: View {
     }
 
     // MARK: Library + photo loading
+    private var libraryCountText: String {
+        guard let assets else { return "0 PHOTOS" }
+        var photos = 0, videos = 0
+        assets.enumerateObjects { a, _, _ in if a.mediaType == .video { videos += 1 } else { photos += 1 } }
+        return videos > 0 ? "\(photos) PHOTOS · \(videos) \(videos == 1 ? "VIDEO" : "VIDEOS")" : "\(photos) PHOTOS"
+    }
+
     private func fetchAssets() {
         let o = PHFetchOptions()
         o.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-        assets = PHAsset.fetchAssets(with: .image, options: o)
+        o.predicate = NSPredicate(format: "mediaType == %d OR mediaType == %d", PHAssetMediaType.image.rawValue, PHAssetMediaType.video.rawValue)
+        assets = PHAsset.fetchAssets(with: o)
     }
 
     /// Removes photos from the iPhone's library. iOS shows its own "Delete N Photos?" confirmation first; nothing happens if you cancel.
@@ -494,10 +562,23 @@ struct LabSlider: View {
 private struct LabThumb: View {
     let asset: PHAsset
     @State private var image: UIImage?
+    static func duration(_ s: TimeInterval) -> String {
+        let t = Int(s.rounded()); return String(format: "%d:%02d", t / 60, t % 60)
+    }
     var body: some View {
         GeometryReader { g in
             Group { if let image { Image(uiImage: image).resizable().scaledToFill() } else { Color.gray.opacity(0.25) } }
                 .frame(width: g.size.width, height: g.size.height).clipped()
+        }
+        .overlay(alignment: .bottomLeading) {
+            if asset.mediaType == .video {
+                HStack(spacing: 4) {
+                    Image(systemName: "play.fill").font(.system(size: 9, weight: .bold))
+                    Text(Self.duration(asset.duration)).font(.system(size: 11, weight: .heavy, design: .monospaced))
+                }
+                .foregroundStyle(.white).padding(.horizontal, 7).padding(.vertical, 4)
+                .background(Color.black.opacity(0.55), in: Capsule()).padding(6)
+            }
         }
         .onAppear {
             let o = PHImageRequestOptions(); o.deliveryMode = .opportunistic; o.resizeMode = .fast; o.isNetworkAccessAllowed = true
