@@ -10,7 +10,9 @@
 		017DB2F1BDF00D11518F415B /* PhotoLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95FFFC0A2BB62B86CFC9A6E0 /* PhotoLog.swift */; };
 		0917BDA227EBC7BBA4936665 /* NotBoringWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1CA307ED100EC2560AC175F /* NotBoringWidgets.swift */; };
 		0971976ED4316A88EEAB654C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6D78982F7C3FDB319CE922DC /* Assets.xcassets */; };
+		1AFAEC65BB725DB543D712FE /* DevelopingActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36549912F40566B1CDA786F4 /* DevelopingActivity.swift */; };
 		1C1C5B6A896628061ED4864A /* ColorwayShare.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11E52EB7B07639EC7F99FBA9 /* ColorwayShare.swift */; };
+		1EC05F3DF142744E4065AAF7 /* DevelopingActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36549912F40566B1CDA786F4 /* DevelopingActivity.swift */; };
 		386D2DE6FE37AA08C5045751 /* SharedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 252453FADEB8003D76075B3C /* SharedStore.swift */; };
 		408DE4537F4F15E7FFE10B77 /* Intents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44372BE70AE3A9CF7F351255 /* Intents.swift */; };
 		48151C230A37731B4F6E2B2C /* Styles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 776CC998FD73D5EB73936F99 /* Styles.swift */; };
@@ -27,6 +29,7 @@
 		67C178C1ADE841BEA39A0234 /* NotBoringLockedCapture.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 09472209BF7451D388D0F42E /* NotBoringLockedCapture.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		698C39950EA8427FC8D0B5BA /* RollNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8428FAB9BECA7714F2C6BEB3 /* RollNotifications.swift */; };
 		6F85D01F2CFA545CA858CA24 /* ContactSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E59F0BF76B2032FE6B97EEB /* ContactSheet.swift */; };
+		7176B0ECAEAD791CF289F6B9 /* DevelopingLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = E98BBFC0235359A97C6823A6 /* DevelopingLiveActivity.swift */; };
 		87F14321ED3C05D7F44D543C /* PhotoBook.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7574E5127022EAB2CBC6384 /* PhotoBook.swift */; };
 		8B541C2478D767CBE04F71A7 /* Achievements.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6D9A08F605BDD3E1FAA456D /* Achievements.swift */; };
 		95D7D7829F206112558CF025 /* PhotoLabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ECFCDC7117B9D464075F59A /* PhotoLabView.swift */; };
@@ -35,12 +38,14 @@
 		ABD69503401AC7DA581E5B2E /* CaptureIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41855A947E9008B0E6616AB4 /* CaptureIntent.swift */; };
 		AEBF0CA75EA5CC4F87B055FC /* Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA2A49FB31318C6EA043928E /* Settings.swift */; };
 		C9D1B1EF54A2ED6468F22B01 /* LockedCaptureExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6F1B4BAC01AAE7B3220BCD2 /* LockedCaptureExtension.swift */; };
+		CA7454B3F802AC6D744E1112 /* RollActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = F57F0C74E8189D8F60740366 /* RollActivity.swift */; };
 		CBA84BA782D53F6A8DA5DBE7 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50CAB7735085446EE1F8A67D /* SettingsView.swift */; };
 		CF7E2FA56A25D07B43F1F0BA /* CaptureIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41855A947E9008B0E6616AB4 /* CaptureIntent.swift */; };
 		D56D71AE239DB597CF707CD3 /* Controls.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE84DBE6D9B5D161BF5CB8F9 /* Controls.swift */; };
 		D8235DB991FEA74A822A7444 /* NotBoringCameraApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C69E82211BBFD752AC3F6A /* NotBoringCameraApp.swift */; };
 		EF9C363BAEEA87501930E250 /* NotBoringWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = DA0EB8B7D338033EE0D8E946 /* NotBoringWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		F31416568FF63CD6C6732385 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BE398015B7AEFECD36F9FCD3 /* Assets.xcassets */; };
+		F6BC44BD22DF1FDE4BB096A5 /* DevelopingActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36549912F40566B1CDA786F4 /* DevelopingActivity.swift */; };
 		F915E7D8289C2F91DEDE24A9 /* Roll.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1702F0D65BDEAB7CEAED0C32 /* Roll.swift */; };
 		FFC55B5C16F6FBC4D2B2EB5B /* AppIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB5732D948E023C4E7141E11 /* AppIntegration.swift */; };
 /* End PBXBuildFile section */
@@ -88,6 +93,7 @@
 		252453FADEB8003D76075B3C /* SharedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedStore.swift; sourceTree = "<group>"; };
 		2AF851B6A8A736107F260793 /* LockedCapture.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LockedCapture.entitlements; sourceTree = "<group>"; };
 		33DC86E2C3FB740F9368D1F4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		36549912F40566B1CDA786F4 /* DevelopingActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopingActivity.swift; sourceTree = "<group>"; };
 		41855A947E9008B0E6616AB4 /* CaptureIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureIntent.swift; sourceTree = "<group>"; };
 		44372BE70AE3A9CF7F351255 /* Intents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Intents.swift; sourceTree = "<group>"; };
 		50CAB7735085446EE1F8A67D /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -112,8 +118,10 @@
 		D6C69E82211BBFD752AC3F6A /* NotBoringCameraApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotBoringCameraApp.swift; sourceTree = "<group>"; };
 		D6D9A08F605BDD3E1FAA456D /* Achievements.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Achievements.swift; sourceTree = "<group>"; };
 		DA0EB8B7D338033EE0D8E946 /* NotBoringWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = NotBoringWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		E98BBFC0235359A97C6823A6 /* DevelopingLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopingLiveActivity.swift; sourceTree = "<group>"; };
 		EA116E3704AE634F3BED9C90 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		F1CA307ED100EC2560AC175F /* NotBoringWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotBoringWidgets.swift; sourceTree = "<group>"; };
+		F57F0C74E8189D8F60740366 /* RollActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RollActivity.swift; sourceTree = "<group>"; };
 		F6F1B4BAC01AAE7B3220BCD2 /* LockedCaptureExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockedCaptureExtension.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -122,6 +130,7 @@
 			isa = PBXGroup;
 			children = (
 				41855A947E9008B0E6616AB4 /* CaptureIntent.swift */,
+				36549912F40566B1CDA786F4 /* DevelopingActivity.swift */,
 				44372BE70AE3A9CF7F351255 /* Intents.swift */,
 				252453FADEB8003D76075B3C /* SharedStore.swift */,
 			);
@@ -132,6 +141,7 @@
 			isa = PBXGroup;
 			children = (
 				BE398015B7AEFECD36F9FCD3 /* Assets.xcassets */,
+				E98BBFC0235359A97C6823A6 /* DevelopingLiveActivity.swift */,
 				EA116E3704AE634F3BED9C90 /* Info.plist */,
 				79B778D2EFF789FA28088ECE /* MoreWidgets.swift */,
 				F1CA307ED100EC2560AC175F /* NotBoringWidgets.swift */,
@@ -175,6 +185,7 @@
 				5E59F0BF76B2032FE6B97EEB /* ContactSheet.swift */,
 				95FFFC0A2BB62B86CFC9A6E0 /* PhotoLog.swift */,
 				1702F0D65BDEAB7CEAED0C32 /* Roll.swift */,
+				F57F0C74E8189D8F60740366 /* RollActivity.swift */,
 				8428FAB9BECA7714F2C6BEB3 /* RollNotifications.swift */,
 				BA2A49FB31318C6EA043928E /* Settings.swift */,
 				776CC998FD73D5EB73936F99 /* Styles.swift */,
@@ -370,6 +381,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				CF7E2FA56A25D07B43F1F0BA /* CaptureIntent.swift in Sources */,
+				1EC05F3DF142744E4065AAF7 /* DevelopingActivity.swift in Sources */,
+				7176B0ECAEAD791CF289F6B9 /* DevelopingLiveActivity.swift in Sources */,
 				5A92108CEA877EB70DE54711 /* Intents.swift in Sources */,
 				56CCB9238265A1A6928A20B1 /* MoreWidgets.swift in Sources */,
 				0917BDA227EBC7BBA4936665 /* NotBoringWidgets.swift in Sources */,
@@ -390,6 +403,7 @@
 				1C1C5B6A896628061ED4864A /* ColorwayShare.swift in Sources */,
 				6F85D01F2CFA545CA858CA24 /* ContactSheet.swift in Sources */,
 				D56D71AE239DB597CF707CD3 /* Controls.swift in Sources */,
+				F6BC44BD22DF1FDE4BB096A5 /* DevelopingActivity.swift in Sources */,
 				5E6E0F6CDAB35D6D7E7DC119 /* Intents.swift in Sources */,
 				D8235DB991FEA74A822A7444 /* NotBoringCameraApp.swift in Sources */,
 				87F14321ED3C05D7F44D543C /* PhotoBook.swift in Sources */,
@@ -397,6 +411,7 @@
 				017DB2F1BDF00D11518F415B /* PhotoLog.swift in Sources */,
 				58ED5F5080349F9B37A97A1E /* PreviewView.swift in Sources */,
 				F915E7D8289C2F91DEDE24A9 /* Roll.swift in Sources */,
+				CA7454B3F802AC6D744E1112 /* RollActivity.swift in Sources */,
 				698C39950EA8427FC8D0B5BA /* RollNotifications.swift in Sources */,
 				AEBF0CA75EA5CC4F87B055FC /* Settings.swift in Sources */,
 				CBA84BA782D53F6A8DA5DBE7 /* SettingsView.swift in Sources */,
@@ -411,6 +426,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				547EF5711FC909273A100101 /* CaptureIntent.swift in Sources */,
+				1AFAEC65BB725DB543D712FE /* DevelopingActivity.swift in Sources */,
 				408DE4537F4F15E7FFE10B77 /* Intents.swift in Sources */,
 				C9D1B1EF54A2ED6468F22B01 /* LockedCaptureExtension.swift in Sources */,
 				A120610EBAA60F938D1AA735 /* SharedStore.swift in Sources */,

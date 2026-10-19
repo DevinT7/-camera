@@ -30,7 +30,7 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLName: com.devin.camera.notboring
             CFBundleURLSchemes: [notboringcamera]
-        NSSupportsLiveActivities: false
+        NSSupportsLiveActivities: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.devin.camera.notboring

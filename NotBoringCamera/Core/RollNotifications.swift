@@ -25,6 +25,17 @@ enum RollNotifications {
         center.add(UNNotificationRequest(identifier: id(rollID), content: c, trigger: trigger))
     }
 
+    /// Sent as soon as a roll is sealed: "Good things take a day. Roll 004 develops tomorrow at 9:41 PM."
+    static func sealed(number: Int, at date: Date, hours: Int) {
+        let cal = Calendar.current
+        let day = cal.isDateInToday(date) ? "today" : (cal.isDateInTomorrow(date) ? "tomorrow" : date.formatted(.dateTime.weekday(.wide)))
+        let c = UNMutableNotificationContent()
+        c.title = hours >= 24 ? "Good things take a day." : "Developing…"
+        c.body = "Roll \(String(format: "%03d", number)) develops \(day) at \(date.formatted(date: .omitted, time: .shortened))."
+        c.sound = .default
+        center.add(UNNotificationRequest(identifier: "sealed-\(number)", content: c, trigger: UNTimeIntervalNotificationTrigger(timeInterval: 2, repeats: false)))
+    }
+
     static func cancel(rollID: UUID) {
         center.removePendingNotificationRequests(withIdentifiers: [id(rollID)])
         center.removeDeliveredNotifications(withIdentifiers: [id(rollID)])

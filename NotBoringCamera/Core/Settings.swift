@@ -58,6 +58,7 @@ final class AppSettings: ObservableObject {
     @AppStorage("lightLeaks") var lightLeaks: LeakOption = .style
     @AppStorage("filmRoll") var filmRoll = false
     @AppStorage("rollSize") var rollSize = 24
+    @AppStorage("developHours") var developHours = 24   // 2, 4, 8 or 24
     @AppStorage("colorway") var colorwayID = "orange"
     @AppStorage("customColorways") private var customColorwaysData = Data()
 

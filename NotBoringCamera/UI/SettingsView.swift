@@ -70,9 +70,16 @@ struct SettingsView: View {
         Section("Film Roll") {
             Toggle("Film roll mode", isOn: $s.filmRoll)
                 .onChange(of: s.filmRoll) { _, on in if on { RollNotifications.requestIfNeeded() } }
-            Text("A fixed number of frames. No preview, no deleting. Shots are held back and “developed” into Photos 24 hours after the last frame.").font(.footnote).foregroundStyle(.secondary)
+            Text("A fixed number of frames. No preview, no deleting. Shots are held back and “developed” into Photos a set time after the last frame.").font(.footnote).foregroundStyle(.secondary)
             if s.filmRoll {
                 Picker("Frames per roll", selection: $s.rollSize) { Text("24").tag(24); Text("36").tag(36) }.pickerStyle(.segmented)
+                Picker("Development time", selection: $s.developHours) {
+                    Text("2h").tag(2); Text("4h").tag(4); Text("8h").tag(8); Text("24h").tag(24)
+                }.pickerStyle(.segmented)
+                Text(s.developHours <= 8
+                     ? "When a roll is finished, a Live Activity on your Lock Screen and Dynamic Island counts down until it develops."
+                     : "iOS only keeps a Live Activity for 8 hours, so a 24-hour roll gets a notification when it is sealed and another when it is ready.")
+                    .font(.footnote).foregroundStyle(.secondary)
                 LabeledContent("On the roll", value: "\(roll.framesShot) of \(roll.current?.size ?? s.rollSize) shot")
                 if roll.pendingFrames > 0 {
                     LabeledContent("Waiting to develop", value: "\(roll.pendingFrames) frames")

@@ -128,6 +128,7 @@ struct NotBoringWidgetBundle: WidgetBundle {
         FilmRollWidget()
         LastPhotoWidget()
         StreakWidget()
+        DevelopingLiveActivity()
         LaunchWidget()
         OpenCameraControl()
         CaptureCameraControl()

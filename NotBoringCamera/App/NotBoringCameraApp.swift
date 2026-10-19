@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 @main
 struct NotBoringCameraApp: App {
@@ -13,7 +14,10 @@ struct NotBoringCameraApp: App {
                 .onOpenURL { url in
                     if let c = ColorwayCodec.colorway(from: url) { settings.customColorways.append(c); settings.colorwayID = c.id }
                 }
-                .onAppear { LockedCaptureImporter.importPending() }
+                .onAppear {
+                    LockedCaptureImporter.importPending()
+                    UNUserNotificationCenter.current().delegate = NotificationPresenter.shared
+                }
         }
     }
 }

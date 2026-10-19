@@ -8,7 +8,9 @@ struct FilmRoll: Codable, Identifiable {
     var size: Int
     var files: [String] = []
     var lastShot: Date?
-    var developAt: Date? { lastShot.map { $0.addingTimeInterval(RollStore.developDelay) } }
+    var delay: TimeInterval?     // chosen when the roll was loaded; nil on rolls from before the setting existed (24h)
+    var number: Int?
+    var developAt: Date? { lastShot.map { $0.addingTimeInterval(delay ?? RollStore.developDelay) } }
     var isFull: Bool { files.count >= size }
 }
 
@@ -45,12 +47,17 @@ final class RollStore: ObservableObject {
     }
 
     func add(file: String) {
-        if current == nil { rolls.append(FilmRoll(size: AppSettings.shared.rollSize)) }
+        if current == nil {
+            let n = UserDefaults.standard.integer(forKey: "rollCounter") + 1
+            UserDefaults.standard.set(n, forKey: "rollCounter")
+            rolls.append(FilmRoll(size: AppSettings.shared.rollSize, delay: Double(AppSettings.shared.developHours) * 3600, number: n))
+        }
         let i = rolls.count - 1
         rolls[i].files.append(file)
         rolls[i].lastShot = Date()
         if rolls[i].isFull { StatsStore.shared.recordFullRoll() }
         persist()
+        if rolls[i].isFull { seal(rolls[i]) }
         RollNotifications.requestIfNeeded()
         RollNotifications.schedule(rollID: rolls[i].id, at: rolls[i].developAt ?? Date().addingTimeInterval(Self.developDelay), frames: rolls[i].files.count)
     }
@@ -60,6 +67,15 @@ final class RollStore: ObservableObject {
         guard let i = rolls.lastIndex(where: { !$0.isFull }), !rolls[i].files.isEmpty else { return }
         rolls[i].size = rolls[i].files.count
         persist()
+        seal(rolls[i])
+    }
+
+    /// A roll just became final (last frame shot, or finished early): tell the user when it will be ready.
+    private func seal(_ r: FilmRoll) {
+        guard let at = r.developAt else { return }
+        let n = r.number ?? 0
+        RollNotifications.sealed(number: n, at: at, hours: Int((r.delay ?? Self.developDelay) / 3600))
+        RollActivity.start(number: n, frames: r.files.count, developAt: at)
     }
 
     func developDue(force: Bool = false) {
@@ -80,6 +96,7 @@ final class RollStore: ObservableObject {
                 guard let self, !failed else { return }
                 urls.forEach { try? FileManager.default.removeItem(at: $0) }
                 RollNotifications.cancel(rollID: roll.id)
+                RollActivity.end(number: roll.number)
                 self.rolls.removeAll { $0.id == roll.id }
                 self.persist()
                 StatsStore.shared.recordRollDeveloped()
