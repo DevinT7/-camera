@@ -221,20 +221,15 @@ struct CameraView: View {
             let size = CGSize(width: width, height: width / r)
             ZStack {
                 if model.hasCamera {
-                    let sideways = abs(model.deviceTurn) == 90
+                    // The viewfinder never turns with the phone (the stream is always portrait, like the system Camera),
+                    // so turning is instant. Only a camera flip softens it for a moment.
                     Group {
-                        if useNativePreview { SystemPreviewView(session: model.session, position: model.position, angle: model.liveAngle, model: model) }
+                        if useNativePreview { SystemPreviewView(session: model.session, position: model.position, angle: 90, model: model) }
                         else { PreviewView(model: model) }
                     }
-                        .blur(radius: (model.isSwitching || model.isTurning) ? 18 : 0)
+                        .blur(radius: model.isSwitching ? 18 : 0)
                         .animation(.easeInOut(duration: 0.25), value: model.isSwitching)
-                        .animation(.easeOut(duration: 0.15), value: model.isTurning)
-                        // Held sideways: draw the (world-upright, landscape) picture in a landscape-shaped frame and turn it,
-                        // so the viewfinder reads as a wide landscape box, like the system Camera.
-                        .frame(width: sideways ? size.height : size.width, height: sideways ? size.width : size.height)
-                        .rotationEffect(.degrees(model.deviceTurn))
                         .frame(width: size.width, height: size.height)
-                        .transaction { $0.animation = nil }   // snap, no spin, when the phone turns
                 } else { simulatorPlaceholder }
                 if settings.cameraDiagnostics && model.hasCamera {
                     TimelineView(.periodic(from: .now, by: 0.5)) { _ in Text(model.diagnostics + "\n" + model.rotationReport()) }
@@ -243,6 +238,7 @@ struct CameraView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).padding(8).padding(.top, vfTop).allowsHitTesting(false)
                 }
                 GridOverlay(style: settings.grid)
+                if settings.level && model.hasCamera { LevelOverlay(accent: cw.accentColor) }
                 if settings.histogram && model.isManual && model.hasCamera { HistogramView(bins: model.histogram).frame(width: 96, height: 44).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).padding(10).padding(.top, vfTop) }
                 if let p = model.focusPoint { FocusRing(manual: model.manualFocusActive, minFocusMM: model.minFocusMM).position(p) }
                 if let img = model.reviewImage { Image(uiImage: img).resizable().scaledToFill().transition(.opacity) }
@@ -405,6 +401,8 @@ struct CameraView: View {
             // Turning a manual-only setting while in Auto hands control to Manual (values were seeded from Auto).
             model.touched.insert(model.param)
             if model.param != .ev && !model.isManual { model.isManual = true }
+            // Exposure crossing back to 0 gets a bigger snap, so you can feel it without looking.
+            if model.param == .ev, v != model.evIndex, abs(model.evLadder[v]) < 0.001 { Feedback.detent() }
             switch model.param { case .ev: model.evIndex = v; case .iso: model.isoIndex = v; case .shutter: model.shutterIndex = v; case .wb: model.wbIndex = v; case .focus: model.focusPos = Float(v) / 50 }
         })
     }

@@ -67,6 +67,21 @@ enum Feedback {
         pressGenerator.prepare()
     }
 
+    /// A dial landing on its home value (EV 0): a firm knock plus a short echo, clearly bigger than a notch tick.
+    private static let detentGenerator = UIImpactFeedbackGenerator(style: .heavy)
+    static func detent() {
+        guard AppSettings.shared.haptics else { return }
+        detentGenerator.impactOccurred(intensity: 1)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.07) { UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: 0.7) }
+        detentGenerator.prepare()
+    }
+
+    /// The level settling on the horizon: a light, crisp tap.
+    static func levelSnap() {
+        guard AppSettings.shared.haptics else { return }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: 0.8)
+    }
+
     static func shutter() {
         if AppSettings.shared.sounds { AudioServicesPlaySystemSound(1108) }
         thump()

@@ -48,6 +48,7 @@ final class AppSettings: ObservableObject {
     @AppStorage("mirrorPreview") var mirrorPreview = true
     @AppStorage("systemPreview") var systemPreview = true
     @AppStorage("cameraDiagnostics") var cameraDiagnostics = false
+    @AppStorage("level") var level = true
     @AppStorage("hdr") var hdr = false
     @AppStorage("hiRes") var hiRes = false
     @AppStorage("rawPlusHeic") var rawPlusHeic = false

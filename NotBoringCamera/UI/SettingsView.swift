@@ -94,6 +94,7 @@ struct SettingsView: View {
     @ViewBuilder private var controlsSection: some View {
                 Section("Controls") {
                     Picker("Grid", selection: $s.grid) { ForEach(GridStyle.allCases) { Text($0.rawValue).tag($0) } }
+                    Toggle("Level", isOn: $s.level)
                     Toggle("Histogram", isOn: $s.histogram)
                     Toggle("Camera diagnostics overlay", isOn: $s.cameraDiagnostics)
                     Toggle("Native camera preview when no Style is on", isOn: $s.systemPreview)

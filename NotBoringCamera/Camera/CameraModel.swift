@@ -44,8 +44,6 @@ final class CameraModel: NSObject, ObservableObject {
     @Published var screenFlashing = false
     /// True from the moment a camera switch starts until the first correctly oriented frame arrives (the preview blurs meanwhile).
     @Published var isSwitching = false
-    /// True while the phone is mid-turn and the picture/box are being brought into agreement (the viewfinder softens meanwhile).
-    @Published var isTurning = false
     @Published var diagnostics = ""
     private var previewGateOpen = true        // read on videoQueue, written on sessionQueue
     private var pendingFirstFrame = false
@@ -203,7 +201,8 @@ final class CameraModel: NSObject, ObservableObject {
         session.commitConfiguration()
         applyOrientation(for: pos)
         videoQueue.asyncAfter(deadline: .now() + 0.25) { self.previewGateOpen = true }
-        videoQueue.async { self.lastBufferLandscape = nil; self.angleDirty = true; self.angleDirtyAt = Date() }
+        videoQueue.async { self.configuredAt = Date() }
+        learnPortraitAngle()
 
         device = dev
         installCameraControls(dev)
@@ -240,87 +239,100 @@ final class CameraModel: NSObject, ObservableObject {
         }
     }
 
-    /// Portrait + selfie mirroring. Must run after commitConfiguration: swapping inputs rebuilds the connections,
-    /// so values set before the commit land on the old (discarded) connections and the front camera comes up sideways.
     private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
 
     /// Set by the view: when the system preview layer is on screen we skip building our own preview frames.
     var nativePreviewActive = false
-    private let motion = CMMotionManager()
-
-    /// Degrees to turn the preview box (clockwise) so the scene reads upright to the user while the phone is held sideways.
-    /// The camera output is always world-upright (the coordinator's horizon-level angle), like the system Camera.
-    @Published var deviceTurn: Double = 0
-    @Published var liveAngle: CGFloat = 90
     private var angleObservation: NSKeyValueObservation?
     weak var systemPreviewLayer: AVCaptureVideoPreviewLayer?
 
+    // How rotation works (the same idea as the system Camera): the live stream is always portrait and never changes shape,
+    // so turning the phone never rebuilds the capture pipeline. Each frame is turned upright in Core Image instead, which
+    // is free. Read/written on videoQueue.
+    private var captureAngle: CGFloat = 90      // horizon-level angle from the coordinator
+    private var frameAngle: CGFloat = 90        // the stream's portrait angle, videoQueue's copy of streamAngle
+    /// The connection angle that makes this camera's stream portrait (sessionQueue). It's 90 on the back camera but not on
+    /// every front camera (the Center Stage selfie sensor is mounted differently), so it's learned from the rotation
+    /// coordinator while the phone is held upright, and remembered per camera.
+    private var streamAngle: CGFloat = 90
+    private let motion = CMMotionManager()
+    private var phoneUpright = false            // sessionQueue; false until gravity says so
+    private var recordTurn = 0                   // a video keeps the orientation it started in
+    private var configuredAt = Date.distantPast
+    private var fixingAngle = false
+
     /// Live rotation numbers for the diagnostics overlay.
     func rotationReport() -> String {
-        let o = UIDevice.current.orientation
-        let names = [0: "unknown", 1: "portrait", 2: "upsideDown", 3: "landscapeLeft", 4: "landscapeRight", 5: "faceUp", 6: "faceDown"]
-        let coord = rotationCoordinator
         func f(_ v: CGFloat?) -> String { v.map { String(format: "%.0f", $0) } ?? "-" }
-        let layerAngle = f(systemPreviewLayer?.connection?.videoRotationAngle)
+        let coord = rotationCoordinator
         let out = videoOutput.connection(with: .video)
-        let mirror = out.map { $0.isVideoMirrored ? "Y" : "N" } ?? "-"
-        let acc = motion.accelerometerData?.acceleration
-        let l1 = "orient \(names[o.rawValue] ?? "?")  turn \(Int(deviceTurn))  accel x \(String(format: "%.2f", acc?.x ?? 0)) y \(String(format: "%.2f", acc?.y ?? 0))"
-        let l2 = "coord capture \(f(coord?.videoRotationAngleForHorizonLevelCapture))  preview \(f(coord?.videoRotationAngleForHorizonLevelPreview))"
-        let l3 = "layer \(layerAngle)  output \(f(out?.videoRotationAngle))  mirrored \(mirror)  native \(nativePreviewActive ? "Y" : "N")"
-        return [l1, l2, l3].joined(separator: "\n")
+        let l1 = "coord capture \(f(coord?.videoRotationAngleForHorizonLevelCapture))  portrait \(f(streamAngle))  upright \(phoneUpright ? "Y" : "N")"
+        let l2 = "layer \(f(systemPreviewLayer?.connection?.videoRotationAngle))  output \(f(out?.videoRotationAngle))  native \(nativePreviewActive ? "Y" : "N")"
+        return [l1, l2].joined(separator: "\n")
     }
 
-    /// Which way the phone is physically held, from gravity. The viewfinder turn must not be derived from the camera's rotation
-    /// angle: that angle moves the opposite way on the selfie camera, which turned its preview upside down.
-    /// (UIDevice.orientation isn't reliable either: with the interface locked to portrait it stays "portrait".)
+    /// Horizon-level rotation from the system coordinator (it accounts for each sensor's mounting and for gravity).
+    func currentAngle() -> CGFloat { rotationCoordinator?.videoRotationAngleForHorizonLevelCapture ?? 90 }
+
+    /// Clockwise turn (0/90/180/270) that takes a frame shot at connection angle `from` to how it looks at angle `to`.
+    static func turn(_ to: CGFloat, from: CGFloat) -> Int { ((Int((to - from).rounded()) % 360) + 360) % 360 / 90 * 90 }
+    private func snap(_ a: CGFloat) -> CGFloat { CGFloat(((Int((a / 90).rounded()) * 90) % 360 + 360) % 360) }
+
+    /// Which way the phone is held, from gravity (the UI is portrait-locked, so the interface can't tell us).
     private func startMotion() {
         guard motion.isAccelerometerAvailable, !motion.isAccelerometerActive else { return }
-        motion.accelerometerUpdateInterval = 0.05
+        motion.accelerometerUpdateInterval = 0.1
         motion.startAccelerometerUpdates(to: .main) { [weak self] data, _ in
             guard let self, let a = data?.acceleration else { return }
-            guard abs(a.z) < 0.85 else { return }                                  // lying flat: keep the last one
-            var t: Double?
-            if abs(a.x) > abs(a.y) + 0.1 { t = a.x < 0 ? 90 : -90 }                // turned counter-clockwise: turn the picture clockwise
-            else if abs(a.y) > abs(a.x) + 0.1 { t = a.y < 0 ? 0 : 180 }
-            guard let t else { return }
-            self.videoQueue.async {
-                guard t != self.targetTurn else { return }
-                self.targetTurn = t; self.angleDirty = true; self.angleDirtyAt = Date()
-                DispatchQueue.main.async {
-                    self.isTurning = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { self.isTurning = false }   // safety
-                }
+            let upright = a.y < -0.75 && abs(a.x) < 0.4 && abs(a.z) < 0.85
+            self.sessionQueue.async {
+                let was = self.phoneUpright
+                self.phoneUpright = upright
+                if upright && !was { self.learnPortraitAngle() }
             }
         }
     }
 
-    // Read/written on videoQueue. A rotation change is committed (box turn + layer angle) only when the first frame in the new
-    // orientation arrives, so the picture and the box change in the same instant instead of one trailing the other.
-    private var targetTurn: Double = 0
-    private var committedTurn: Double = 0
-    private var angleDirty = true
-    private var angleDirtyAt = Date.distantPast
-    private var lastBufferLandscape: Bool?
+    /// Runs on sessionQueue. Uses the remembered portrait angle for this camera, and while the phone is upright reads the
+    /// real one from the coordinator (upright, horizon-level capture is portrait by definition).
+    private func learnPortraitAngle() {
+        guard let dev = device ?? session.inputs.compactMap({ ($0 as? AVCaptureDeviceInput)?.device }).first(where: { $0.hasMediaType(.video) }) else { return }
+        let key = "portraitAngle.\(dev.uniqueID)"
+        var angle = UserDefaults.standard.object(forKey: key) as? Double ?? 90
+        if phoneUpright, let a = rotationCoordinator?.videoRotationAngleForHorizonLevelCapture {
+            angle = Double(snap(a))
+            UserDefaults.standard.set(angle, forKey: key)
+        }
+        let target = CGFloat(angle)
+        streamAngle = target
+        if let c = videoOutput.connection(with: .video), c.videoRotationAngle != target, c.isVideoRotationAngleSupported(target) {
+            c.videoRotationAngle = target
+        }
+        videoQueue.async { self.frameAngle = target }
+    }
 
-    /// Horizon-level rotation from the system coordinator (it accounts for each sensor's mounting and for gravity).
-    /// No preview layer is attached to the coordinator, so the capture angle is the meaningful one.
-    func currentAngle() -> CGFloat { rotationCoordinator?.videoRotationAngleForHorizonLevelCapture ?? 90 }
+    /// Turns a frame clockwise by a multiple of 90°. Exact, and the result starts at the origin.
+    private func turned(_ img: CIImage, clockwise deg: Int) -> CIImage {
+        switch (deg % 360 + 360) % 360 {
+        case 90: return img.oriented(.right)
+        case 180: return img.oriented(.down)
+        case 270: return img.oriented(.left)
+        default: return img
+        }
+    }
 
     private func watchAngle(_ coordinator: AVCaptureDevice.RotationCoordinator) {
+        // Only remembered: the stream itself is never re-rotated (that's what made turns slow and glitchy).
         angleObservation = coordinator.observe(\.videoRotationAngleForHorizonLevelCapture, options: [.initial, .new]) { [weak self] _, change in
             guard let self, let a = change.newValue else { return }
-            self.sessionQueue.async {
-                if let c = self.videoOutput.connection(with: .video), c.isVideoRotationAngleSupported(a) { c.videoRotationAngle = a }
-            }
-            self.videoQueue.async { self.angleDirty = true; self.angleDirtyAt = Date() }
+            self.videoQueue.async { self.captureAngle = a }
         }
     }
 
     private func applyOrientation(for pos: AVCaptureDevice.Position) {
         for out in [videoOutput as AVCaptureOutput, photoOutput] {
             guard let c = out.connection(with: .video) else { continue }
-            let angle = currentAngle()
+            let angle: CGFloat = out === videoOutput ? streamAngle : currentAngle()   // live stream: fixed portrait
             if c.isVideoRotationAngleSupported(angle) { c.videoRotationAngle = angle }
             if c.isVideoMirroringSupported {
                 c.automaticallyAdjustsVideoMirroring = false
@@ -682,44 +694,53 @@ extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAu
         if output === audioOutput { appendAudio(sampleBuffer); return }
         guard previewGateOpen, let pb = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         let st = renderState
-        var img = CIImage(cvPixelBuffer: pb)
-        let landscape = CVPixelBufferGetWidth(pb) > CVPixelBufferGetHeight(pb)
-        // Portrait <-> landscape: wait until the camera really delivers frames in the new shape, so the box never turns while
-        // the picture hasn't (or the other way round). Same-shape changes (0 <-> 180, 90 <-> -90) settle after a short hold.
-        func wantsLandscape(_ turn: Double) -> Bool { abs(turn) == 90 }
-        if angleDirty {
-            let age = Date().timeIntervalSince(angleDirtyAt)
-            let sameShape = wantsLandscape(committedTurn) == wantsLandscape(targetTurn)
-            if (sameShape ? age > 0.15 : landscape == wantsLandscape(targetTurn)) || age > 0.6 {
-                angleDirty = false
-                committedTurn = targetTurn
-                let a = currentAngle(), t = targetTurn
-                DispatchQueue.main.async {
-                    self.deviceTurn = t; self.liveAngle = a
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { self.isTurning = false }
+        var raw = CIImage(cvPixelBuffer: pb)
+        // The stream should always be portrait. Switching cameras rebuilds the connection and can drop that setting,
+        // leaving frames in the sensor's native sideways shape: straighten them here and put portrait back.
+        let c = connection.videoRotationAngle, want = frameAngle
+        if abs(c - want) > 1 {
+            raw = turned(raw, clockwise: Self.turn(want, from: c))
+            if !fixingAngle {
+                fixingAngle = true
+                sessionQueue.async {
+                    let a = self.streamAngle
+                    if let conn = self.videoOutput.connection(with: .video), conn.isVideoRotationAngleSupported(a) { conn.videoRotationAngle = a }
+                    self.videoQueue.async { self.fixingAngle = false }
                 }
             }
         }
-        lastBufferLandscape = landscape
-        // Frames whose shape disagrees with the box's current turn belong to a turn in progress: don't show them.
-        if landscape != wantsLandscape(committedTurn) { return }
+        let landscape = raw.extent.width > raw.extent.height
+        // Right after a camera switch a few frames can still come in the wrong shape: skip those.
+        if landscape && Date().timeIntervalSince(configuredAt) < 1 { return }
         if pendingFirstFrame {
             pendingFirstFrame = false
             let d = device
             let info = "\(d?.deviceType.rawValue.replacingOccurrences(of: "AVCaptureDeviceType", with: "") ?? "?")\nbuffer \(CVPixelBufferGetWidth(pb))×\(CVPixelBufferGetHeight(pb)) \(landscape ? "landscape" : "portrait")\nfov \(String(format: "%.1f", d?.activeFormat.videoFieldOfView ?? 0))° zoom \(String(format: "%.2f", d?.videoZoomFactor ?? 0)) base \(String(format: "%.2f", zoomBase))\nfmt \(d.map { "\(CMVideoFormatDescriptionGetDimensions($0.activeFormat.formatDescription).width)×\(CMVideoFormatDescriptionGetDimensions($0.activeFormat.formatDescription).height)" } ?? "?")"
             DispatchQueue.main.async { self.isSwitching = false; self.diagnostics = info }
         }
-        img = Styles.apply(st.style, to: img)
         let front = device?.position == .front
-        if isRecording { appendVideo(front && settings.mirrorSelfies ? img.oriented(.upMirrored) : img, at: CMSampleBufferGetPresentationTimeStamp(sampleBuffer)) }
+        let liveTurn = Self.turn(captureAngle, from: want)
+        // Style and mirror in world-upright terms (what gets saved), so a sideways shot looks the same in the viewfinder.
+        func upright(_ turn: Int, mirror: Bool) -> CIImage {
+            let u = turned(raw, clockwise: turn)
+            var img = Styles.apply(st.style, to: u).cropped(to: u.extent)
+            if mirror { img = img.oriented(.upMirrored) }
+            return img
+        }
+        if isRecording {
+            appendVideo(upright(recordTurn, mirror: front && settings.mirrorSelfies), at: CMSampleBufferGetPresentationTimeStamp(sampleBuffer))
+        }
+        guard !nativePreviewActive || st.histogram else { return }
         // Live selfie preview: mirrored like a mirror (the system Camera's viewfinder), independent of what gets saved.
-        if front && settings.mirrorPreview { img = img.oriented(.upMirrored) }
+        // Then turned back to the phone's own frame: the viewfinder never turns, the scene in it stays upright.
+        // Selfie: a mirrored portrait view that never turns, like a hand mirror (what the system Camera shows).
+        var img = front
+            ? { let m = Styles.apply(st.style, to: raw).cropped(to: raw.extent); return settings.mirrorPreview ? m.oriented(.upMirrored) : m }()
+            : turned(upright(liveTurn, mirror: false), clockwise: 360 - liveTurn)
         frameCount += 1
         if st.histogram, frameCount % 4 == 0 { computeHistogram(img) }
-        if isManual || true {
-            if st.peaking { img = overlayPeaking(img) }
-            if st.zebra { img = overlayZebra(img) }
-        }
+        if st.peaking { img = overlayPeaking(img) }
+        if st.zebra { img = overlayZebra(img) }
         if !nativePreviewActive, let cg = ciContext.createCGImage(img, from: img.extent) { frameSink?(cg) }
     }
 
@@ -799,6 +820,7 @@ extension CameraModel {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("rec-\(UUID().uuidString).mov")
         guard let w = try? AVAssetWriter(outputURL: url, fileType: .mov) else { return }
         videoQueue.async {
+            self.recordTurn = Self.turn(self.captureAngle, from: self.frameAngle)   // locked for the whole clip, like the system Camera
             self.writer = w; self.writerStarted = false; self.recordingURL = url
             self.writerVideo = nil; self.writerAudio = nil; self.adaptor = nil
         }
@@ -845,8 +867,11 @@ extension CameraModel {
         var pbOut: CVPixelBuffer?
         CVPixelBufferPoolCreatePixelBuffer(nil, pool, &pbOut)
         guard let pb = pbOut else { return }
+        // Pool buffers are recycled: paint every pixel, or parts of an old frame stay stuck in the clip.
         let scaled = image.transformed(by: CGAffineTransform(scaleX: CGFloat(outW) / e.width, y: CGFloat(outH) / e.height))
-        ciContext.render(scaled, to: pb)
+            .transformed(by: CGAffineTransform(translationX: -e.minX * CGFloat(outW) / e.width, y: -e.minY * CGFloat(outH) / e.height))
+        let bounds = CGRect(x: 0, y: 0, width: outW, height: outH)
+        ciContext.render(scaled.composited(over: CIImage(color: .black).cropped(to: bounds)), to: pb, bounds: bounds, colorSpace: nil)
         ad.append(pb, withPresentationTime: pts)
     }
 

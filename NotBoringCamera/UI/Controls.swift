@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import CoreMotion
 
 final class TiltBox: ObservableObject {
     let tilt = Tilt()
@@ -177,6 +178,75 @@ struct GridOverlay: View {
             .stroke(.white.opacity(0.55), lineWidth: 0.8)
         }
         .allowsHitTesting(false)
+    }
+}
+
+/// Phone roll against the horizon, from gravity. Runs only while the level is on screen.
+final class LevelMotion: ObservableObject {
+    /// Roll in degrees, clockwise positive (0 = upright portrait, 90 = turned clockwise onto its side).
+    @Published var roll: Double = 0
+    /// False when the phone is near flat (pointing at the floor or sky): there's no horizon to level against.
+    @Published var usable = true
+    private let mm = CMMotionManager()
+    private var smoothed: Double?
+
+    func start() {
+        guard mm.isDeviceMotionAvailable, !mm.isDeviceMotionActive else { return }
+        mm.deviceMotionUpdateInterval = 1 / 60
+        mm.startDeviceMotionUpdates(to: .main) { [weak self] m, _ in
+            guard let self, let g = m?.gravity else { return }
+            self.usable = abs(g.z) < 0.85
+            let a = atan2(g.x, -g.y) * 180 / .pi
+            // Light smoothing, unwrapped across ±180 so it never spins the long way round.
+            if let s = self.smoothed {
+                var d = a - s
+                if d > 180 { d -= 360 } else if d < -180 { d += 360 }
+                self.smoothed = s + d * 0.35
+            } else { self.smoothed = a }
+            self.roll = self.smoothed!
+        }
+    }
+    func stop() { mm.stopDeviceMotionUpdates(); smoothed = nil }
+}
+
+/// The iPhone Camera's level: two fixed side marks and a centre line that stays on the horizon. Shown only when the phone
+/// is within a few degrees of upright or sideways; when it's level the pieces join, turn the accent colour and tap once.
+struct LevelOverlay: View {
+    let accent: Color
+    @StateObject private var motion = LevelMotion()
+    @State private var isLevel = false
+
+    var body: some View {
+        let r = motion.roll
+        let base = (r / 90).rounded() * 90                 // nearest upright / sideways / upside-down hold
+        let off = r - base
+        let visible = motion.usable && abs(off) < 12
+        let color = isLevel ? accent : .white
+        ZStack {
+            // Fixed marks, square to the way the phone is held.
+            HStack(spacing: 0) {
+                Capsule().fill(color).frame(width: 22, height: 2)
+                Spacer().frame(width: isLevel ? 0 : 92)
+                Capsule().fill(color).frame(width: 22, height: 2)
+            }
+            .rotationEffect(.degrees(-base))
+            // Centre line on the horizon: turns against the phone's roll.
+            Capsule().fill(color).frame(width: isLevel ? 92 : 84, height: isLevel ? 2.5 : 1.5)
+                .rotationEffect(.degrees(-r))
+        }
+        .shadow(color: .black.opacity(0.35), radius: 1.5)
+        .opacity(visible ? 1 : 0)
+        .animation(.easeOut(duration: 0.15), value: visible)
+        .animation(.easeOut(duration: 0.12), value: isLevel)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+        .onChange(of: abs(off)) { _, d in
+            // Hysteresis so it doesn't flicker (or buzz) right at the edge.
+            if !isLevel && d < 0.8 && visible { isLevel = true; Feedback.levelSnap() }
+            else if isLevel && (d > 1.6 || !visible) { isLevel = false }
+        }
+        .onAppear { motion.start() }
+        .onDisappear { motion.stop() }
     }
 }
 
