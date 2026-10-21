@@ -17,6 +17,7 @@ struct CameraView: View {
     @State private var zoomReadout = false
     @State private var zoomReadoutToken = 0
     @State private var zoomDragBase: CGFloat?
+    @State private var zoomNotch: Int?
     @State private var shutterBlink = false
     @Environment(\.scenePhase) private var scenePhase
 
@@ -125,19 +126,20 @@ struct CameraView: View {
     // MARK: Photo / Video switch (always visible so the current mode is obvious)
     private var modeToggle: some View {
         HStack(spacing: 0) {
+            // Photo covers Long and Double too (picked from the top bar); this switch is only stills vs video.
             ForEach([CaptureMode.photo, .video], id: \.self) { m in
-                let on = model.captureMode == m
-                Image(systemName: m == .photo ? "camera.fill" : "video.fill").font(.system(size: 14, weight: .bold))
+                let on = (model.captureMode == .video) == (m == .video)
+                Image(systemName: m.symbol).font(.system(size: 14, weight: .bold))
                     .frame(width: 40, height: 34)
                     .background(on ? (m == .video ? Color(hex: "FF3B30") : cw.dialColor) : .clear, in: Capsule())
                     .foregroundStyle(on ? .white : cw.ink.opacity(0.6))
                     .contentShape(Capsule())
-                    .onTapGesture { model.setMode(m); Feedback.toggle() }
-                    .accessibilityLabel(m == .photo ? "Photo" : "Video")
+                    .onTapGesture { if !on { model.setMode(m) }; Feedback.toggle() }
+                    .accessibilityLabel(m.label.capitalized)
             }
         }
         .padding(3).background(cw.panelColor, in: Capsule())
-        .opacity(model.isRecording ? 0.4 : 1).allowsHitTesting(!model.isRecording)
+        .opacity(model.isRecording || model.longProgress != nil ? 0.4 : 1).allowsHitTesting(!model.isRecording && model.longProgress == nil)
         .animation(.easeInOut(duration: 0.2), value: model.captureMode)
     }
 
@@ -170,6 +172,7 @@ struct CameraView: View {
             roundButton("gearshape.fill") { showSettings = true }
             roundButton("trophy.fill") { showAchievements = true }
             Spacer()
+            exposureKindMenu
             Button {
                 withAnimation(.easeInOut(duration: 0.3)) { settings.fullScreenPreview.toggle() }
                 Feedback.toggle()
@@ -192,6 +195,26 @@ struct CameraView: View {
             .accessibilityLabel("Flash \(model.flash.rawValue)")
         }
         .padding(.top, 6)
+    }
+
+    /// Normal, long or double exposure. Lit up while a special one is on, so it's never forgotten.
+    private var exposureKindMenu: some View {
+        let special = model.captureMode == .long || model.captureMode == .double
+        return Menu {
+            Picker("Exposure", selection: Binding(get: { model.captureMode == .video ? .photo : model.captureMode },
+                                                 set: { model.setMode($0) })) {
+                Label("Normal", systemImage: "camera.fill").tag(CaptureMode.photo)
+                Label("Long exposure (\(Int(CameraModel.longSeconds)) s)", systemImage: CaptureMode.long.symbol).tag(CaptureMode.long)
+                Label("Double exposure", systemImage: CaptureMode.double.symbol).tag(CaptureMode.double)
+            }
+        } label: {
+            Image(systemName: special ? model.captureMode.symbol : "camera.aperture")
+                .font(.system(size: 16, weight: .bold)).foregroundStyle(special ? .black.opacity(0.85) : cw.ink)
+                .frame(width: 40, height: 40)
+                .background(special ? cw.accentColor : cw.panelColor, in: RoundedRectangle(cornerRadius: 10))
+        }
+        .disabled(model.captureMode == .video || model.isRecording).opacity(model.captureMode == .video ? 0.45 : 1)
+        .accessibilityLabel("Exposure type: \(model.captureMode.label.lowercased())")
     }
 
     private func cycleFlash() {
@@ -241,6 +264,12 @@ struct CameraView: View {
                 if settings.level && model.hasCamera { LevelOverlay(accent: cw.accentColor) }
                 if settings.histogram && model.isManual && model.hasCamera { HistogramView(bins: model.histogram).frame(width: 96, height: 44).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).padding(10).padding(.top, vfTop) }
                 if let p = model.focusPoint { FocusRing(manual: model.manualFocusActive, minFocusMM: model.minFocusMM).position(p) }
+                if let ghost = model.doubleGhost, model.captureMode == .double {
+                    Image(uiImage: ghost).resizable().scaledToFill().frame(width: size.width, height: size.height).clipped()
+                        .opacity(0.4).allowsHitTesting(false).transition(.opacity)
+                }
+                if model.captureMode == .double { doubleBadge.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top).padding(.top, 12 + vfTop) }
+                if let p = model.longProgress { LongExposureProgress(progress: p, accent: cw.accentColor) }
                 if let img = model.reviewImage { Image(uiImage: img).resizable().scaledToFill().transition(.opacity) }
                 if !fullScreen {
                     VStack {
@@ -270,7 +299,7 @@ struct CameraView: View {
                         .padding(.horizontal, 10).padding(.vertical, 5).background(Color.red, in: Capsule())
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top).padding(.top, 12 + vfTop)
                 }
-                if settings.filmRoll && model.captureMode == .photo { rollBadge.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: fullScreen ? .topLeading : .topTrailing).padding(12).padding(.top, vfTop) }
+                if settings.filmRoll && model.captureMode != .video { rollBadge.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: fullScreen ? .topLeading : .topTrailing).padding(12).padding(.top, vfTop) }
                 Color.black.opacity(shutterBlink ? 0.45 : 0).allowsHitTesting(false)
                 StylePickerOverlay(styles: model.styles, index: $model.styleIndex, accent: cw.accentColor, visible: styleToast,
                                    topInset: fullScreen ? safeInsets.top : 0, bottomInset: fullScreen ? safeInsets.bottom : 0)
@@ -306,6 +335,21 @@ struct CameraView: View {
         }
     }
 
+    /// Double exposure status: which half is next, and a way to throw away the first.
+    private var doubleBadge: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "square.on.square").font(.system(size: 11, weight: .bold))
+            Text(model.doubleGhost == nil ? "SHOT 1 OF 2" : "LINE UP SHOT 2").font(.system(size: 12, weight: .heavy, design: .rounded))
+            if model.doubleGhost != nil {
+                Button { model.cancelDouble() } label: { Image(systemName: "xmark.circle.fill").font(.system(size: 15, weight: .bold)) }
+                    .buttonStyle(.plain).accessibilityLabel("Discard first exposure")
+            }
+        }
+        .foregroundStyle(.white).padding(.horizontal, 10).padding(.vertical, 5)
+        .background(.black.opacity(0.45), in: Capsule())
+        .animation(.easeInOut(duration: 0.2), value: model.doubleGhost == nil)
+    }
+
     private var simulatorPlaceholder: some View {
         ZStack {
             LinearGradient(colors: [Color(hex: "3A4A6B"), Color(hex: "E58A4F"), Color(hex: "1B1B2B")], startPoint: .top, endPoint: .bottom)
@@ -331,12 +375,6 @@ struct CameraView: View {
     private var zoomBar: some View {
         let stops = model.quickZoomStops
         return VStack(spacing: 6) {
-            Text(zoomText(model.zoom))
-                .font(.system(size: 13, weight: .heavy, design: .rounded)).monospacedDigit()
-                .padding(.vertical, 4).padding(.horizontal, 10)
-                .background(cw.accentColor, in: Capsule()).foregroundStyle(.black)
-                .opacity(zoomReadout ? 1 : 0).scaleEffect(zoomReadout ? 1 : 0.85)
-                .animation(.easeOut(duration: 0.2), value: zoomReadout)
             HStack(spacing: 4) {
                 ForEach(stops, id: \.self) { s in
                     let active = abs(model.zoom - s) < 0.03
@@ -351,18 +389,45 @@ struct CameraView: View {
             }
             .animation(.easeOut(duration: 0.15), value: stops.map { abs(model.zoom - $0) < 0.03 })
             .padding(4).background(.black.opacity(0.35), in: Capsule())
+            // The wheel rises behind the stops while zoom changes: you can see how far you've gone and what's next.
+            .background(alignment: .bottom) {
+                ZoomWheel(zoom: model.zoom, minZoom: model.minZoom, maxZoom: model.maxZoom, stops: stops, accent: cw.accentColor,
+                          mm: model.position == .back ? Int((24 * model.zoom).rounded()) : nil)
+                    .frame(width: 420, height: 150)
+                    .offset(y: 12)
+                    .opacity(wheelUp ? 1 : 0)
+                    .scaleEffect(wheelUp ? 1 : 0.92, anchor: .bottom)
+                    .animation(.easeOut(duration: 0.22), value: wheelUp)
+                    // While it's up, the wheel itself turns: drag it sideways (left zooms in, like pulling the next number under the pointer).
+                    .allowsHitTesting(wheelUp)
+                    .gesture(DragGesture(minimumDistance: 2).onChanged { v in
+                        if zoomDragBase == nil { zoomDragBase = model.zoom }
+                        model.setZoom((zoomDragBase ?? 1) * pow(2, -v.translation.width / ZoomWheel.pointsPerDoubling))
+                    }.onEnded { _ in zoomDragBase = nil; bumpWheel() })
+            }
             .highPriorityGesture(DragGesture(minimumDistance: 6).onChanged { v in
                 if zoomDragBase == nil { zoomDragBase = model.zoom }
                 let span = log(max(model.maxZoom / model.minZoom, 1.01))
                 model.setZoom((zoomDragBase ?? 1) * exp(v.translation.width / 260 * span))
-            }.onEnded { _ in zoomDragBase = nil })
+            }.onEnded { _ in zoomDragBase = nil; bumpWheel() })
         }
-        .onChange(of: model.zoom) { _, _ in
-            zoomReadout = true
-            zoomReadoutToken += 1
-            let t = zoomReadoutToken
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { if t == zoomReadoutToken { zoomReadout = false } }
+        .onChange(of: model.zoom) { old, z in
+            // A notch every 1/10 of a stop of zoom, and a firmer one on each lens stop, so you can feel it without looking.
+            let n = Int((log2(z) * 10).rounded(.down))
+            if let last = zoomNotch, n != last, zoomDragBase != nil || pinchBase != nil {
+                if stops.contains(where: { (min(old, z)...max(old, z)).contains($0) && abs($0 - old) > 0.001 }) { Feedback.detent() } else { Feedback.zoomTick() }
+            }
+            zoomNotch = n
+            bumpWheel()
         }
+    }
+    /// The wheel stays up while a finger is on it (or the zoom row), and for a moment after the zoom last changed.
+    private var wheelUp: Bool { zoomReadout || zoomDragBase != nil }
+    private func bumpWheel() {
+        zoomReadout = true
+        zoomReadoutToken += 1
+        let t = zoomReadoutToken
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { if t == zoomReadoutToken { zoomReadout = false } }
     }
     private func fmt(_ s: CGFloat) -> String { s < 1 ? String(format: "%.1f", s).replacingOccurrences(of: "0.5", with: ".5") : String(Int(s)) }
     private func zoomText(_ z: CGFloat) -> String { String(format: z < 10 ? "%.1f×" : "%.0f×", z) }
@@ -370,7 +435,18 @@ struct CameraView: View {
     // MARK: Manual strip
     private var manualStrip: some View {
         HStack(spacing: 6) {
-            ForEach(ManualParam.allCases) { p in
+            Button { model.matchMeter() } label: {
+                VStack(spacing: 3) {
+                    Text("METER").font(.system(size: 10, weight: .heavy, design: .rounded)).opacity(0.7)
+                    LightMeterNeedle(offset: model.meterOffset, accent: cw.accentColor, ink: ink).frame(height: 16)
+                }
+                .frame(maxWidth: .infinity).padding(.vertical, 6).padding(.horizontal, 4)
+                .background(cw.panelColor, in: RoundedRectangle(cornerRadius: 10))
+                .foregroundStyle(ink)
+            }
+            .buttonStyle(.plain).layoutPriority(1)
+            .accessibilityLabel(String(format: "Light meter %+.1f stops. Tap to match.", model.meterOffset))
+            ForEach(ManualParam.allCases.filter { $0 != .ev }) { p in
                 VStack(spacing: 2) {
                     Text(p.rawValue).font(.system(size: 10, weight: .heavy, design: .rounded)).opacity(0.7)
                     Text(value(for: p)).font(.system(size: 12, weight: .heavy, design: .rounded)).monospacedDigit()
@@ -427,10 +503,11 @@ struct CameraView: View {
         }
     }
 
-    /// Tap the dial to cycle what it controls: EXP → SS → ISO → WB → FOCUS → EXP (works in Auto and Manual).
+    /// Tap the dial to cycle what it controls: EXP → SS → ISO → WB → FOCUS → EXP (Manual skips EXP).
     private func cycleParam() {
-        let all = ManualParam.allCases
-        let next = all[(all.firstIndex(of: model.param)! + 1) % all.count]
+        // EV only steers Auto, so Manual's cycle leaves it out.
+        let all = ManualParam.allCases.filter { !model.isManual || $0 != .ev }
+        let next = all[((all.firstIndex(of: model.param) ?? -1) + 1) % all.count]
         if next != .ev && !model.isManual { model.seedManualFromAuto() }
         model.param = next
         Feedback.toggle()
@@ -467,7 +544,7 @@ struct CameraView: View {
         HStack {
             VStack(spacing: 6) {
                 modeToggle
-                Text(model.captureMode == .video ? "VIDEO" : "PHOTO").font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(ink).tracking(1)
+                Text(model.captureMode.label).font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(ink).tracking(1)
             }
             Spacer()
             ChunkySwitch(top: "M", bottom: "A", isOn: $model.isManual, colorway: cw, labelColor: fullScreen ? .white : nil)

@@ -1,6 +1,7 @@
 import AVFoundation
 import CoreMotion
 import CoreImage
+import Vision
 import Photos
 import UIKit
 import SwiftUI
@@ -17,7 +18,11 @@ struct RenderState {
     var histogram = false
 }
 
-enum CaptureMode: Hashable { case photo, video }
+enum CaptureMode: Hashable, CaseIterable {
+    case photo, video, long, double
+    var label: String { switch self { case .photo: "PHOTO"; case .video: "VIDEO"; case .long: "LONG"; case .double: "DOUBLE" } }
+    var symbol: String { switch self { case .photo: "camera.fill"; case .video: "video.fill"; case .long: "scribble.variable"; case .double: "square.on.square" } }
+}
 
 final class CameraModel: NSObject, ObservableObject {
     // MARK: UI state
@@ -27,7 +32,13 @@ final class CameraModel: NSObject, ObservableObject {
     @Published var zoom: CGFloat = 1
     @Published var minZoom: CGFloat = 1
     @Published var maxZoom: CGFloat = 10
-    @Published var isManual = false { didSet { applyModeChange() } }
+    @Published var isManual = false {
+        didSet {
+            guard isManual != oldValue else { return }
+            if isManual { seedManualFromAuto() }   // start from what Auto was doing, so the picture doesn't jump
+            applyModeChange()
+        }
+    }
     @Published var param: ManualParam = .ev
     @Published var flash: FlashSetting = .off
     @Published var styles: [CameraStyle] = Styles.all
@@ -51,6 +62,28 @@ final class CameraModel: NSObject, ObservableObject {
     private var captureWasFront = false
     @Published var isRecording = false
     @Published var recordSeconds = 0
+    /// How far the scene is from a normal exposure, in stops (+ = too bright). The Manual light meter's needle.
+    @Published var meterOffset: Float = 0
+    private var meterObservation: NSKeyValueObservation?
+    /// 0...1 while a long exposure is gathering frames, nil otherwise.
+    @Published var longProgress: Double?
+    /// The first frame of a double exposure, shown faintly over the viewfinder until the second is taken.
+    @Published var doubleGhost: UIImage?
+
+    // Long exposure (videoQueue): live frames are lined up and averaged for a few seconds.
+    static let longSeconds = 3.0
+    private var longRunning = false
+    private var longStart: CFTimeInterval = 0
+    private var longCount = 0
+    private var longTurn = 0
+    private var longAcc: CIImageAccumulator?
+    private var longRef: CIImage?
+    private var longRefScale: CGFloat = 1
+
+    // Double exposure: the first shot waits here (finish() runs on the photo delegate's queue, cancel on main).
+    private let doubleLock = NSLock()
+    private var doubleFirst: CIImage?
+    private var captureIsDouble = false
 
     // stepped manual values (index into ladders)
     @Published var evIndex = 18 { didSet { applyEV() } }          // 0...36 -> -6...+6 in 1/3
@@ -61,6 +94,13 @@ final class CameraModel: NSObject, ObservableObject {
     /// Settings the user has moved off their defaults (drives the reset affordance).
     @Published var touched: Set<ManualParam> = []
     private var seeding = false
+
+    /// Manual values handed to the session queue (it can't read the main-thread ladders safely).
+    private struct ManualValues { var iso: Float; var duration: Double; var kelvin: Float?; var lens: Float? }
+    /// The back camera's lenses, widest first, with the zoom (relative to 1×) where each one takes over. Manual mode runs on
+    /// one of these directly: the combined multi-lens camera Auto uses doesn't allow manual shutter, ISO, focus or white balance.
+    private var backLenses: [(device: AVCaptureDevice, start: CGFloat)] = []   // sessionQueue
+    private var laddersBuilt = false
 
     var evLadder: [Float] { (0...36).map { Float($0 - 18) / 3 } }
     private(set) var isoLadder: [Float] = [54, 100, 200, 400, 800, 1600, 3200, 6400, 12000]
@@ -124,7 +164,12 @@ final class CameraModel: NSObject, ObservableObject {
         let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
         guard status == .authorized || status == .limited else { return }
         PhotoLog.shared.backfillIfNeeded()
-        guard let asset = PhotoLog.shared.existingAssets().first?.1 else { lastImage = nil; return }
+        // The newest thing in the whole library (photo or video), so the button reads as "your photos" from the first launch.
+        let o0 = PHFetchOptions()
+        o0.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        o0.predicate = NSPredicate(format: "mediaType == %d || mediaType == %d", PHAssetMediaType.image.rawValue, PHAssetMediaType.video.rawValue)
+        o0.fetchLimit = 1
+        guard let asset = PHAsset.fetchAssets(with: o0).firstObject ?? PhotoLog.shared.existingAssets().first?.1 else { lastImage = nil; return }
         let o = PHImageRequestOptions(); o.deliveryMode = .opportunistic; o.resizeMode = .fast; o.isNetworkAccessAllowed = true
         PHImageManager.default().requestImage(for: asset, targetSize: CGSize(width: 180, height: 180), contentMode: .aspectFill, options: o) { img, _ in
             DispatchQueue.main.async { if let img { self.lastImage = img } }
@@ -147,7 +192,10 @@ final class CameraModel: NSObject, ObservableObject {
             }
         default: DispatchQueue.main.async { self.authorized = false }
         }
-        PHPhotoLibrary.requestAuthorization(for: .addOnly) { _ in }
+        // Read access too: the library button shows your newest photo, and Photo Lab needs it anyway.
+        if PHPhotoLibrary.authorizationStatus(for: .readWrite) == .notDetermined {
+            PHPhotoLibrary.requestAuthorization(for: .readWrite) { _ in Task { @MainActor in self.refreshLastImage() } }
+        }
     }
 
     func stop() { sessionQueue.async { if self.session.isRunning { self.session.stopRunning() } } }
@@ -159,7 +207,7 @@ final class CameraModel: NSObject, ObservableObject {
             if !self.configured { self.configure(position: .back); self.configured = true }
             if !self.session.isRunning { self.session.startRunning() }
             // Re-apply a remembered Manual mode now that the session is actually running.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { if self.isManual { self.applyModeChange() } }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { if self.isManual { self.seedManualFromAuto(); self.applyModeChange() } }
         }
     }
 
@@ -170,8 +218,42 @@ final class CameraModel: NSObject, ObservableObject {
         return AVCaptureDevice.DiscoverySession(deviceTypes: types, mediaType: .video, position: pos).devices.first
     }
 
-    private func configure(position pos: AVCaptureDevice.Position) {
-        guard let dev = pickDevice(pos), let input = try? AVCaptureDeviceInput(device: dev) else {
+    /// `manual` set: run on a single physical lens with these values applied. `keepZoom`: stay at this zoom (lens swaps).
+    private func configure(position pos: AVCaptureDevice.Position, manual: ManualValues? = nil, keepZoom: CGFloat? = nil) {
+        guard let picked = pickDevice(pos) else {
+            DispatchQueue.main.async { self.hasCamera = false }
+            return
+        }
+        // Continuous zoom range, expressed relative to the main (1x) lens.
+        var base: CGFloat = 1
+        if pos == .back, picked.constituentDevices.contains(where: { $0.deviceType == .builtInUltraWideCamera }),
+           let first = picked.virtualDeviceSwitchOverVideoZoomFactors.first {
+            base = CGFloat(truncating: first)
+        }
+        if pos == .front, picked.deviceType == .builtInUltraWideCamera {
+            // The Center Stage selfie camera is ultra-wide. Open at a normal selfie framing (~24mm equivalent, like the system
+            // Camera) so "1×" isn't the full 95° view; the wider view stays available below 1×.
+            var nominal: CGFloat = 0
+            if #available(iOS 26.0, *) { nominal = CGFloat(picked.nominalFocalLengthIn35mmFilm) }
+            let focal = nominal > 0 ? nominal : 18 / tan(CGFloat(picked.activeFormat.videoFieldOfView) * .pi / 360)
+            base = min(max(24 / focal, 1), max(picked.maxAvailableVideoZoomFactor / 2, 1))
+        }
+        if pos == .back {
+            backLenses = []
+            if picked.isVirtualDevice {
+                let starts = [1] + picked.virtualDeviceSwitchOverVideoZoomFactors.map { CGFloat(truncating: $0) }
+                backLenses = zip(picked.constituentDevices, starts).map { ($0, $1 / base) }
+            }
+        }
+        let lo = picked.minAvailableVideoZoomFactor / base
+        let hi = min(picked.maxAvailableVideoZoomFactor / base, 25)
+        let startZoom = min(max(keepZoom ?? (pos == .back && settings.rememberSettings ? CGFloat(settings.lastLens) : 1), lo), hi)
+        var dev = picked
+        if manual != nil, pos == .back, let lens = lens(for: startZoom) {
+            dev = lens.device
+            base = 1 / lens.start
+        }
+        guard let input = try? AVCaptureDeviceInput(device: dev) else {
             DispatchQueue.main.async { self.hasCamera = false }
             return
         }
@@ -181,7 +263,8 @@ final class CameraModel: NSObject, ObservableObject {
         DispatchQueue.main.async { self.isSwitching = true }
         session.beginConfiguration()
         session.sessionPreset = .photo
-        session.inputs.forEach { session.removeInput($0) }
+        // Only the camera input: the microphone (added the first time video is recorded) stays.
+        session.inputs.compactMap { $0 as? AVCaptureDeviceInput }.filter { $0.device.hasMediaType(.video) }.forEach { session.removeInput($0) }
         if session.canAddInput(input) { session.addInput(input) }
         if !session.outputs.contains(photoOutput), session.canAddOutput(photoOutput) {
             session.addOutput(photoOutput)
@@ -205,29 +288,22 @@ final class CameraModel: NSObject, ObservableObject {
         learnPortraitAngle()
 
         device = dev
+        meterObservation = dev.observe(\.exposureTargetOffset, options: [.new]) { [weak self] d, _ in
+            let v = (d.exposureTargetOffset * 10).rounded() / 10
+            DispatchQueue.main.async { if let self, self.meterOffset != v { self.meterOffset = v } }
+        }
         installCameraControls(dev)
-        // Continuous zoom range, expressed relative to the main (1x) lens.
-        var base: CGFloat = 1
-        if pos == .back, dev.constituentDevices.contains(where: { $0.deviceType == .builtInUltraWideCamera }),
-           let first = dev.virtualDeviceSwitchOverVideoZoomFactors.first {
-            base = CGFloat(truncating: first)
-        }
-        if pos == .front, dev.deviceType == .builtInUltraWideCamera {
-            // The Center Stage selfie camera is ultra-wide. Open at a normal selfie framing (~24mm equivalent, like the system
-            // Camera) so "1×" isn't the full 95° view; the wider view stays available below 1×.
-            var nominal: CGFloat = 0
-            if #available(iOS 26.0, *) { nominal = CGFloat(dev.nominalFocalLengthIn35mmFilm) }
-            let focal = nominal > 0 ? nominal : 18 / tan(CGFloat(dev.activeFormat.videoFieldOfView) * .pi / 360)
-            base = min(max(24 / focal, 1), max(dev.maxAvailableVideoZoomFactor / 2, 1))
-        }
         zoomBase = base
-        let lo = dev.minAvailableVideoZoomFactor / base
-        let hi = min(dev.maxAvailableVideoZoomFactor / base, 25)
-        let startZoom = min(max(pos == .back && settings.rememberSettings ? CGFloat(settings.lastLens) : 1, lo), hi)
         buildLadders(dev)
         try? dev.lockForConfiguration()
-        dev.videoZoomFactor = startZoom * base
-        if dev.isExposureModeSupported(.continuousAutoExposure) { dev.exposureMode = .continuousAutoExposure }
+        dev.videoZoomFactor = min(max(startZoom * base, dev.minAvailableVideoZoomFactor), dev.maxAvailableVideoZoomFactor)
+        if let m = manual {
+            applyManualLocked(dev, m)
+        } else {
+            if dev.isExposureModeSupported(.continuousAutoExposure) { dev.exposureMode = .continuousAutoExposure }
+            if dev.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) { dev.whiteBalanceMode = .continuousAutoWhiteBalance }
+            if dev.isFocusModeSupported(.continuousAutoFocus) { dev.focusMode = .continuousAutoFocus }
+        }
         dev.unlockForConfiguration()
         let minFocus = Int(dev.minimumFocusDistance)
         DispatchQueue.main.async {
@@ -351,28 +427,55 @@ final class CameraModel: NSObject, ObservableObject {
         var shutters: [Double] = []
         var t = dMax
         while t > dMin { shutters.append(t); t /= pow(2, 1.0 / 3) }
-        isoLadder = isos
-        shutterLadder = shutters.isEmpty ? [1.0 / 60] : shutters
+        let shutterList = shutters.isEmpty ? [1.0 / 60] : shutters
+        let first = !laddersBuilt
+        laddersBuilt = true
         DispatchQueue.main.async {
-            self.isoIndex = min(self.isoIndex, isos.count - 1)
-            self.shutterIndex = self.shutterLadder.firstIndex { $0 <= 1.0 / 60 } ?? 0
+            // Keep the chosen ISO and shutter across lens/camera switches (each lens has its own ladder); defaults ISO 100, 1/60.
+            let iso = first ? 100 : self.isoLadder[min(self.isoIndex, self.isoLadder.count - 1)]
+            let dur = first ? 1.0 / 60 : self.shutterLadder[min(self.shutterIndex, self.shutterLadder.count - 1)]
+            self.seeding = true
+            self.isoLadder = isos
+            self.shutterLadder = shutterList
+            self.isoIndex = isos.enumerated().min { abs($0.element - iso) < abs($1.element - iso) }?.offset ?? 0
+            self.shutterIndex = shutterList.enumerated().min { abs(log($0.element / dur)) < abs(log($1.element / dur)) }?.offset ?? 0
+            self.seeding = false
         }
+    }
+
+    /// The physical back lens that should be used at zoom `z`: the longest one that doesn't need to zoom out. sessionQueue.
+    private func lens(for z: CGFloat) -> (device: AVCaptureDevice, start: CGFloat)? {
+        backLenses.last { $0.start <= z + 0.001 } ?? backLenses.first
+    }
+
+    private func manualValues() -> ManualValues {
+        ManualValues(iso: isoLadder[min(isoIndex, isoLadder.count - 1)],
+                     duration: shutterLadder[min(shutterIndex, shutterLadder.count - 1)],
+                     kelvin: touched.contains(.wb) ? wbLadder[wbIndex] : nil,
+                     lens: touched.contains(.focus) ? focusPos : nil)
     }
 
     // MARK: Controls
     func flip() {
         let new: AVCaptureDevice.Position = position == .back ? .front : .back
-        sessionQueue.async { self.configure(position: new) }
+        let m = isManual ? manualValues() : nil
+        sessionQueue.async { self.configure(position: new, manual: m) }
     }
 
     func setZoom(_ z: CGFloat, ramp: Bool = false) {
         let clamped = min(max(z, minZoom), maxZoom)
         zoom = clamped
         settings.lastLens = Double(clamped)
+        let m = isManual && !isRecording ? manualValues() : nil
         sessionQueue.async {
             guard let d = self.device else { return }
+            // Manual runs on one physical lens: zooming past where another lens takes over swaps to that lens.
+            if let m, let want = self.lens(for: clamped), want.device != d, self.backLenses.contains(where: { $0.device == d }) {
+                self.configure(position: .back, manual: m, keepZoom: clamped)
+                return
+            }
             try? d.lockForConfiguration()
-            let target = clamped * self.zoomBase
+            let target = min(max(clamped * self.zoomBase, d.minAvailableVideoZoomFactor), d.maxAvailableVideoZoomFactor)
             if ramp { d.ramp(toVideoZoomFactor: target, withRate: 6) } else { d.cancelVideoZoomRamp(); d.videoZoomFactor = target }
             d.unlockForConfiguration()
         }
@@ -433,6 +536,23 @@ final class CameraModel: NSObject, ObservableObject {
         Feedback.thump()
     }
 
+    /// Moves shutter speed (then ISO, if the shutter would get too slow to hand-hold) so the light meter reads 0.
+    func matchMeter() {
+        let off = Double(meterOffset)
+        guard isManual, abs(off) >= 0.15 else { return }
+        let dur = shutterLadder[min(shutterIndex, shutterLadder.count - 1)]
+        var iso = Double(isoLadder[min(isoIndex, isoLadder.count - 1)])
+        var want = dur * pow(2, -off)
+        let slowest = max(dur, 1.0 / 30), fastest = shutterLadder.last ?? want
+        if want > slowest { iso *= want / slowest; want = slowest }
+        if want < fastest { iso *= want / fastest; want = fastest }
+        func nearestLog<T: BinaryFloatingPoint>(_ a: [T], _ v: Double) -> Int { a.enumerated().min { abs(log(Double($0.element) / v)) < abs(log(Double($1.element) / v)) }?.offset ?? 0 }
+        shutterIndex = nearestLog(shutterLadder, want)
+        isoIndex = nearestLog(isoLadder, iso)
+        touched.formUnion([.shutter, .iso])
+        Feedback.detent()
+    }
+
     /// Copies what auto exposure/WB/focus are doing right now into the manual ladders, so switching to manual doesn't jump.
     func seedManualFromAuto() {
         guard let d = device else { return }
@@ -440,6 +560,7 @@ final class CameraModel: NSObject, ObservableObject {
         let g = d.deviceWhiteBalanceGains
         let k = d.temperatureAndTintValues(for: AVCaptureDevice.WhiteBalanceGains(redGain: min(max(g.redGain, 1), d.maxWhiteBalanceGain), greenGain: min(max(g.greenGain, 1), d.maxWhiteBalanceGain), blueGain: min(max(g.blueGain, 1), d.maxWhiteBalanceGain))).temperature
         let lens = d.lensPosition
+        seeding = true; defer { seeding = false }
         if let i = isoLadder.enumerated().min(by: { abs($0.element - iso) < abs($1.element - iso) })?.offset { isoIndex = i }
         if let i = shutterLadder.enumerated().min(by: { abs(log($0.element / max(dur, 1e-6))) < abs(log($1.element / max(dur, 1e-6))) })?.offset { shutterIndex = i }
         if let i = wbLadder.enumerated().min(by: { abs($0.element - k) < abs($1.element - k) })?.offset { wbIndex = i }
@@ -448,13 +569,22 @@ final class CameraModel: NSObject, ObservableObject {
 
     private func applyModeChange() {
         if !isManual { param = .ev; touched = touched.intersection([.ev]) }
+        // EV only steers Auto; in Manual the dial starts on shutter speed.
+        if isManual && param == .ev { param = .shutter }
         pushRenderState()
         settings.lastManual = isManual
+        let manual = isManual, m = manualValues(), pos = position, z = zoom, recording = isRecording
         sessionQueue.async {
             guard let d = self.device else { return }
+            let onLens = self.backLenses.contains { $0.device == d }
+            // The combined back camera can't do manual: move onto the physical lens for this zoom, and back again for Auto.
+            if pos == .back, !recording, !self.backLenses.isEmpty, manual != onLens {
+                self.configure(position: .back, manual: manual ? m : nil, keepZoom: z)
+                return
+            }
             try? d.lockForConfiguration()
-            if self.isManual {
-                if d.isExposureModeSupported(.custom) { d.exposureMode = .custom; self.applyManualExposureLocked(d) }
+            if manual {
+                self.applyManualLocked(d, m)
             } else {
                 if d.isExposureModeSupported(.continuousAutoExposure) { d.exposureMode = .continuousAutoExposure }
                 if d.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) { d.whiteBalanceMode = .continuousAutoWhiteBalance }
@@ -485,12 +615,28 @@ final class CameraModel: NSObject, ObservableObject {
     }
 
     private func applyManualExposureLocked(_ d: AVCaptureDevice) {
-        // Calling this when custom exposure isn't available (session not running yet, some front cameras) raises an NSException.
-        guard d.isExposureModeSupported(.custom) else { return }
-        let iso = isoLadder[min(isoIndex, isoLadder.count - 1)]
-        let dur = shutterLadder[min(shutterIndex, shutterLadder.count - 1)]
-        d.setExposureModeCustom(duration: CMTime(seconds: dur, preferredTimescale: 1_000_000_000),
-                                iso: min(max(iso, d.activeFormat.minISO), d.activeFormat.maxISO))
+        applyManualLocked(d, ManualValues(iso: isoLadder[min(isoIndex, isoLadder.count - 1)],
+                                          duration: shutterLadder[min(shutterIndex, shutterLadder.count - 1)], kelvin: nil, lens: nil))
+    }
+
+    /// Applies manual values to a locked device. Every value is clamped to what this lens allows (out-of-range values raise).
+    private func applyManualLocked(_ d: AVCaptureDevice, _ m: ManualValues) {
+        // Calling this when custom exposure isn't available (session not running yet, combined multi-lens cameras) raises an NSException.
+        if d.isExposureModeSupported(.custom) {
+            let f = d.activeFormat
+            let dur = min(max(m.duration, CMTimeGetSeconds(f.minExposureDuration)), CMTimeGetSeconds(f.maxExposureDuration))
+            d.setExposureModeCustom(duration: CMTime(seconds: dur, preferredTimescale: 1_000_000_000),
+                                    iso: min(max(m.iso, f.minISO), f.maxISO))
+        }
+        if let k = m.kelvin, d.isLockingWhiteBalanceWithCustomDeviceGainsSupported {
+            var g = d.deviceWhiteBalanceGains(for: .init(temperature: k, tint: 0))
+            let mx = d.maxWhiteBalanceGain
+            g.redGain = min(max(g.redGain, 1), mx); g.greenGain = min(max(g.greenGain, 1), mx); g.blueGain = min(max(g.blueGain, 1), mx)
+            d.setWhiteBalanceModeLocked(with: g)
+        }
+        if let p = m.lens, d.isLockingFocusWithCustomLensPositionSupported {
+            d.setFocusModeLocked(lensPosition: min(max(p, 0), 1))
+        }
     }
 
     private func applyWB() {
@@ -525,14 +671,17 @@ final class CameraModel: NSObject, ObservableObject {
     // MARK: Capture
     func capture() {
         if captureMode == .video { toggleRecording(); return }
+        if captureMode == .long { startLongExposure(); return }
         guard hasCamera, !capturing else { return }
         capturing = true
         Feedback.shutter()
+        captureIsDouble = captureMode == .double
         let wantSuper = settings.pipeline == .superRaw && abs(zoom - 1) < 0.05 && position == .back
         let wantPro = settings.pipeline == .proRaw && photoOutput.isAppleProRAWEnabled
         let flashMode = flash
         let hiRes = settings.hiRes
         let dims = photoOutput.maxPhotoDimensions
+        let manualShot = isManual
         captureWasFront = position == .front
         var lead = 0.0
         if position == .front && flash != .off {
@@ -562,11 +711,13 @@ final class CameraModel: NSObject, ObservableObject {
                 if self.photoOutput.supportedFlashModes.contains(m) { s.flashMode = m }
             }
             if hiRes, !self.captureUsedSuperRaw, dims.width > 0 { s.maxPhotoDimensions = dims }
+            // Otherwise the photo pipeline may pick its own ISO/shutter for multi-frame fusion and ignore Manual.
+            if manualShot, !self.captureUsedSuperRaw { s.photoQualityPrioritization = .speed }
             self.photoOutput.capturePhoto(with: s, delegate: self)
         }
     }
 
-    private func finish(raw: Data?, processed: Data?, superRaw: Bool) {
+    private func finish(raw: Data?, processed: Data?, superRaw: Bool, image given: CIImage? = nil, double: Bool = false) {
         DispatchQueue.main.async {
             if self.screenFlashing { self.screenFlashing = false; UIScreen.main.brightness = self.savedBrightness }
         }
@@ -578,8 +729,9 @@ final class CameraModel: NSObject, ObservableObject {
         case .random: style.fx.leak = Float.random(in: 0.35...0.95); style.fx.leakCorner = Int.random(in: 0..<4)
         case .style: break
         }
-        var image: CIImage?
-        if superRaw, let raw, let f = CIRAWFilter(imageData: raw, identifierHint: "com.adobe.raw-image") {
+        var image: CIImage? = given
+        if image != nil {
+        } else if superRaw, let raw, let f = CIRAWFilter(imageData: raw, identifierHint: "com.adobe.raw-image") {
             f.isGamutMappingEnabled = true
             image = f.outputImage
         } else if let processed {
@@ -590,6 +742,23 @@ final class CameraModel: NSObject, ObservableObject {
         guard var img = image else { DispatchQueue.main.async { self.capturing = false }; return }
         // The live preview is always mirrored; the saved selfie is mirrored too only when the setting is on (like iOS's Mirror Front Camera).
         if captureWasFront && s.mirrorSelfies { img = img.oriented(.upMirrored) }
+        if double {
+            doubleLock.lock()
+            let first = doubleFirst
+            if first == nil { doubleFirst = img }
+            doubleLock.unlock()
+            guard let first else {
+                // First half: keep it, show it as a ghost to line up the second, save nothing yet.
+                let k = min(1, 900 / max(img.extent.width, img.extent.height))
+                let small = img.transformed(by: CGAffineTransform(scaleX: k, y: k))
+                let ghost = ciContext.createCGImage(small, from: small.extent).map(UIImage.init(cgImage:))
+                DispatchQueue.main.async { self.doubleGhost = ghost; self.capturing = false; Feedback.detent() }
+                return
+            }
+            img = Self.blendDouble(first, img)
+            doubleLock.lock(); doubleFirst = nil; doubleLock.unlock()
+            DispatchQueue.main.async { self.doubleGhost = nil }
+        }
         img = Styles.apply(style, to: img)
         if superRaw { img = Styles.addGrain(max(style.grain, 0.12), to: img) } else if style.grain > 0 { img = Styles.addGrain(style.grain * 0.6, to: img) }
         img = crop(img, to: s.fullScreenPreview ? AppSettings.screenRatio : s.aspect.ratio)   // full-screen mode saves what the screen shows
@@ -620,6 +789,78 @@ final class CameraModel: NSObject, ObservableObject {
             }
             self.capturing = false
             StatsStore.shared.recordPhoto(styleID: style.id, manual: self.isManual, superRaw: superRaw, zoom: Double(self.zoom))
+        }
+    }
+
+    /// Throws away a waiting first half of a double exposure.
+    func cancelDouble() {
+        doubleLock.lock(); doubleFirst = nil; doubleLock.unlock()
+        doubleGhost = nil
+        Feedback.thump()
+    }
+
+    /// Two exposures on one frame, like rewinding film: a screen blend, so each picture shows through the other's shadows.
+    static func blendDouble(_ a: CIImage, _ b: CIImage) -> CIImage {
+        let e = b.extent, ae = a.extent
+        let k = max(e.width / ae.width, e.height / ae.height)   // fill the second frame even if the phone was turned between shots
+        var first = a.transformed(by: CGAffineTransform(scaleX: k, y: k))
+        first = first.transformed(by: CGAffineTransform(translationX: e.midX - first.extent.midX, y: e.midY - first.extent.midY)).cropped(to: e)
+        // Each half is pulled down a little first so the overlap doesn't blow out to white.
+        func dim(_ i: CIImage) -> CIImage { i.applyingFilter("CIExposureAdjust", parameters: [kCIInputEVKey: -0.45]) }
+        return dim(b).applyingFilter("CIScreenBlendMode", parameters: [kCIInputBackgroundImageKey: dim(first)]).cropped(to: e)
+    }
+
+    // MARK: Long exposure
+    private func startLongExposure() {
+        guard hasCamera, !capturing else { return }
+        capturing = true
+        Feedback.shutter()
+        captureWasFront = position == .front
+        longProgress = 0
+        videoQueue.async {
+            self.longTurn = Self.turn(self.captureAngle, from: self.frameAngle)   // upright however the phone is held
+            self.longAcc = nil; self.longRef = nil; self.longCount = 0
+            self.longStart = CACurrentMediaTime()
+            self.longRunning = true
+        }
+    }
+
+    /// videoQueue. Lines each frame up with the first (so hand shake cancels out and only moving things blur), then
+    /// folds it into a running average.
+    private func accumulateLong(_ raw: CIImage) {
+        let frame = turned(raw, clockwise: longTurn)
+        let e = frame.extent
+        var aligned = frame
+        if let ref = longRef {
+            let small = frame.transformed(by: CGAffineTransform(scaleX: longRefScale, y: longRefScale))
+            let req = VNTranslationalImageRegistrationRequest(targetedCIImage: small)
+            try? VNImageRequestHandler(ciImage: ref).perform([req])
+            if let t = (req.results?.first as? VNImageTranslationAlignmentObservation)?.alignmentTransform {
+                aligned = frame.clampedToExtent()
+                    .transformed(by: CGAffineTransform(translationX: t.tx / longRefScale, y: t.ty / longRefScale)).cropped(to: e)
+            }
+        } else {
+            longRefScale = 320 / max(e.width, e.height)
+            longRef = frame.transformed(by: CGAffineTransform(scaleX: longRefScale, y: longRefScale))
+        }
+        if let acc = longAcc, acc.extent == e {
+            longCount += 1
+            let mixed = acc.image().applyingFilter("CIDissolveTransition", parameters: [kCIInputTargetImageKey: aligned, kCIInputTimeKey: 1 / Double(longCount)])
+            acc.setImage(mixed)
+        } else if longAcc == nil, let acc = CIImageAccumulator(extent: e, format: .RGBAh) {
+            acc.setImage(aligned); longAcc = acc; longCount = 1
+        }
+        let progress = (CACurrentMediaTime() - longStart) / Self.longSeconds
+        DispatchQueue.main.async { if self.longProgress != nil { self.longProgress = min(progress, 1) } }
+        guard progress >= 1, let acc = longAcc else { return }
+        longRunning = false
+        let out = acc.image()
+        let cg = ciContext.createCGImage(out, from: out.extent)
+        longAcc = nil; longRef = nil
+        DispatchQueue.main.async { self.longProgress = nil; Feedback.thump() }
+        DispatchQueue.global(qos: .userInitiated).async {
+            if let cg { self.finish(raw: nil, processed: nil, superRaw: false, image: CIImage(cgImage: cg)) }
+            else { DispatchQueue.main.async { self.capturing = false } }
         }
     }
 
@@ -684,7 +925,7 @@ extension CameraModel: AVCapturePhotoCaptureDelegate {
         if photo.isRawPhoto { pendingRaw = data } else { pendingProcessed = data }
     }
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishCaptureFor resolvedSettings: AVCaptureResolvedPhotoSettings, error: Error?) {
-        finish(raw: pendingRaw, processed: pendingProcessed, superRaw: captureUsedSuperRaw)
+        finish(raw: pendingRaw, processed: pendingProcessed, superRaw: captureUsedSuperRaw, double: captureIsDouble)
     }
 }
 
@@ -727,6 +968,7 @@ extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAu
             if mirror { img = img.oriented(.upMirrored) }
             return img
         }
+        if longRunning { accumulateLong(raw) }
         if isRecording {
             appendVideo(upright(recordTurn, mirror: front && settings.mirrorSelfies), at: CMSampleBufferGetPresentationTimeStamp(sampleBuffer))
         }
@@ -793,7 +1035,9 @@ extension CameraModel: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAu
 extension CameraModel {
     func setMode(_ m: CaptureMode) {
         guard m != captureMode, !isRecording else { return }
-        if m == .video { prepareAudio { ok in DispatchQueue.main.async { self.captureMode = .video } } } else { captureMode = .photo }
+        guard longProgress == nil else { return }
+        if captureMode == .double, doubleGhost != nil { cancelDouble() }
+        if m == .video { prepareAudio { ok in DispatchQueue.main.async { self.captureMode = .video } } } else { captureMode = m }
         Feedback.toggle()
     }
 

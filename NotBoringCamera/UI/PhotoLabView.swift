@@ -10,7 +10,13 @@ struct PhotoLabView: View {
     @EnvironmentObject var model: CameraModel
     @Environment(\.dismiss) private var dismiss
 
-    enum LabTab { case adjust, crop, style }
+    /// The editor's tools, in the order of the sliding name row under the photo.
+    /// One tool, one control: each name in the row opens exactly one thing to change.
+    enum LabTab: String, CaseIterable, Identifiable {
+        case exposure = "Exposure", style = "Style", highlights = "Highlights", shadows = "Shadows", warmth = "Warmth", tint = "Tint",
+             grain = "Grain", crop = "Crop", stickers = "Stickers"
+        var id: String { rawValue }
+    }
 
     @State private var placeholder: UIImage?      // the tapped thumbnail, shown in the card until the full photo is ready
     @State private var lastPickedID: String?      // so the library returns to where you were
@@ -24,14 +30,17 @@ struct PhotoLabView: View {
     @State private var loadingPhoto = false
     @State private var denied = false
     @State private var source: CIImage?
-    @State private var rendered: UIImage?
+    @StateObject private var lab = LabRenderer()
+    @State private var styleTuning = false        // Style tab: strength dial instead of the thumbnails
+    @State private var nameWidths: [LabTab: CGFloat] = [:]
+    @State private var nameDrag: CGFloat = 0
     @State private var comparing = false
-    @State private var tab: LabTab = .adjust
+    @State private var tab: LabTab = .exposure
     @State private var exposure = 0.0
     @State private var grain = 0.0
     @State private var temp = 6500.0
     @State private var tint = 0.0
-    @State private var highlights = 1.0
+    @State private var highlights = 0.0           // −1 recovers bright areas, +1 brightens them
     @State private var shadows = 0.0
     @State private var styleIndex = 0
     @State private var strength = 1.0
@@ -41,7 +50,6 @@ struct PhotoLabView: View {
     @State private var saved = false
     @State private var placed: [PlacedSticker] = []
     @ObservedObject private var statsStore = StatsStore.shared
-    private let ctx = CIContext()
     private var cw: Colorway { s.colorway }
     private var ink: Color { cw.ink }
 
@@ -62,17 +70,17 @@ struct PhotoLabView: View {
                         .opacity(editing ? 0 : 1).scaleEffect(editing ? 1.05 : 1)
                         .allowsHitTesting(!editing).accessibilityHidden(editing)
                         .animation(.easeOut(duration: 0.24), value: editing)
-                    // Step 2: one photo and its tools. Fades in a beat later. The photo, tabs and Save stay put; only the controls scroll.
+                    // Step 2: one photo and its tools. Fades in a beat later. The photo fills the free space; the tool row and Save sit below.
                     Group {
                         if videoAsset != nil {
                             videoView
                         } else {
-                            VStack(alignment: .leading, spacing: 16) {
-                                preview
-                                ScrollView(showsIndicators: false) {
-                                    controls.padding(.top, 4).padding(.bottom, 14)
-                                }
-                                VStack(spacing: 14) { tabs; saveButton }
+                            VStack(spacing: 0) {
+                                preview.frame(maxHeight: .infinity)
+                                readout.frame(height: 30).padding(.top, 14)
+                                toolNames.padding(.top, 6)
+                                controls.frame(height: 100, alignment: .center).padding(.top, 8)
+                                bottomBar.padding(.top, 16)
                             }
                         }
                     }
@@ -86,11 +94,8 @@ struct PhotoLabView: View {
         }
         .preferredColorScheme(cw.isDarkBody ? .dark : .light)
         .task { await loadLibrary() }
-        .onChange(of: [exposure, temp, tint, highlights, shadows, strength, grain]) { _, _ in render() }
-        .onChange(of: styleIndex) { _, _ in render() }
-        .onChange(of: rotation) { _, _ in render() }
-        .onChange(of: flipped) { _, _ in render() }
-        .onChange(of: aspect) { _, _ in render() }
+        .onChange(of: params) { _, _ in render() }
+        .onChange(of: tab) { _, _ in styleTuning = false }
     }
 
     // MARK: Header
@@ -123,17 +128,17 @@ struct PhotoLabView: View {
         // Clear the photo only after the fade, so the screen doesn't change underneath while it fades out.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
             guard !editorOpen else { return }
-            selectedID = nil; selectedDate = nil; source = nil; rendered = nil; loadingPhoto = false; saved = false; placeholder = nil
+            selectedID = nil; selectedDate = nil; source = nil; lab.clear(); loadingPhoto = false; saved = false; placeholder = nil
             player?.pause(); player = nil; videoAsset = nil
         }
     }
 
     // MARK: Preview
+    /// The photo at its own shape (no letterbox bars), rounded and centred in whatever room is left.
     private var preview: some View {
-        ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 26, style: .continuous).fill(Color.black.opacity(0.88))
-            if let r = rendered, let src = source {
-                Image(uiImage: comparing ? original(src) : r).resizable().scaledToFit()
+        ZStack {
+            if source != nil, let r = lab.image {
+                Image(uiImage: comparing ? (lab.original ?? r) : r).resizable().scaledToFit()
                     .overlay(GeometryReader { g in
                         ForEach($placed) { $p in
                             StickerView(sticker: p.sticker, size: g.size.width * 0.2 * p.scale)
@@ -145,40 +150,43 @@ struct PhotoLabView: View {
                                 .contextMenu { Button("Remove", role: .destructive) { placed.removeAll { $0.id == p.id } } }
                         }
                     })
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .overlay { photoBadges }
+                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    .shadow(color: .black.opacity(0.18), radius: 10, y: 6)
                     .onLongPressGesture(minimumDuration: 0.15, maximumDistance: 40, pressing: { comparing = $0 }, perform: {})
             } else if let placeholder {
-                // The thumbnail you tapped, already in the card; the full photo fades in over it.
+                // The thumbnail you tapped, already in place; the full photo fades in over it.
                 Image(uiImage: placeholder).resizable().scaledToFit()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                     .overlay(alignment: .bottom) { ProgressView().tint(.white).padding(.bottom, 12) }
             } else {
-                ProgressView().tint(.white).frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            if source != nil {
-                Button {
-                    if let id = selectedID {
-                        let r = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil)
-                        if let a = r.firstObject { delete([a]) { closeEditor() } }
-                    }
-                } label: {
-                    Image(systemName: "trash").font(.system(size: 16, weight: .bold)).foregroundStyle(.white)
-                        .frame(width: 40, height: 40).background(Color.black.opacity(0.55), in: Circle())
-                }
-                .accessibilityLabel("Delete photo")
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing).padding(12)
-            }
-            if source != nil {
-                Text(chipText).font(.system(size: 11, weight: .semibold, design: .monospaced)).foregroundStyle(.white)
-                    .padding(.horizontal, 12).padding(.vertical, 8).background(Color.black.opacity(0.62), in: Capsule()).padding(14)
-            }
-            if source != nil {
-                Text(comparing ? "ORIGINAL" : "HOLD TO COMPARE").font(.system(size: 9, weight: .heavy, design: .monospaced)).tracking(1).foregroundStyle(.white.opacity(0.75))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom).padding(.bottom, 10).allowsHitTesting(false)
+                ProgressView()
             }
         }
-        .frame(height: UIScreen.main.bounds.height * 0.34)
-        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// Style/date chip, delete, and the compare hint, sitting on the photo itself.
+    private var photoBadges: some View {
+        ZStack {
+            Text(chipText).font(.system(size: 10, weight: .semibold, design: .monospaced)).foregroundStyle(.white)
+                .padding(.horizontal, 10).padding(.vertical, 6).background(Color.black.opacity(0.5), in: Capsule())
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).padding(10)
+            Button {
+                if let id = selectedID {
+                    let r = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil)
+                    if let a = r.firstObject { delete([a]) { closeEditor() } }
+                }
+            } label: {
+                Image(systemName: "trash").font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
+                    .frame(width: 34, height: 34).background(Color.black.opacity(0.5), in: Circle())
+            }
+            .accessibilityLabel("Delete photo")
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing).padding(8)
+            Text(comparing ? "ORIGINAL" : "HOLD TO COMPARE").font(.system(size: 9, weight: .heavy, design: .monospaced)).tracking(1)
+                .foregroundStyle(.white.opacity(0.85)).shadow(color: .black.opacity(0.5), radius: 3)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom).padding(.bottom, 8).allowsHitTesting(false)
+        }
     }
 
     // MARK: Video (viewing only)
@@ -316,100 +324,248 @@ struct PhotoLabView: View {
     }
 
     // MARK: Controls
+    // MARK: Tools
+    private var activeStyle: CameraStyle { model.styles[min(styleIndex, model.styles.count - 1)] }
+
+    /// True when a tool has been moved off its default (its name gets a dot).
+    private func edited(_ t: LabTab) -> Bool {
+        switch t {
+        case .exposure: exposure != 0
+        case .style: styleIndex != 0 || strength < 1
+        case .highlights: highlights != 0
+        case .shadows: shadows != 0
+        case .warmth: temp != 6500
+        case .tint: tint != 0
+        case .grain: grain != 0
+        case .crop: rotation != 0 || flipped || aspect != nil
+        case .stickers: !placed.isEmpty
+        }
+    }
+
+    /// The current tool's value, big and centred above the tool names.
+    private var readout: some View {
+        let text: String = switch tab {
+        case .exposure: String(format: "%+.1f EV", exposure)
+        case .style: activeStyle.name.uppercased() + (strength < 0.999 ? String(format: " · %.0f%%", strength * 100) : "")
+        case .highlights: String(format: "%+.0f", highlights * 100)
+        case .shadows: String(format: "%+.0f", shadows * 100)
+        case .warmth: String(format: "%.0fK", temp)
+        case .tint: String(format: "%+.0f", tint)
+        case .grain: String(format: "%.0f", grain)
+        case .crop: (aspect?.rawValue ?? "ORIGINAL") + (flipped ? " · FLIPPED" : "") + (rotation > 0 ? " · \(rotation * 90)°" : "")
+        case .stickers: placed.isEmpty ? "TAP ONE TO ADD" : "DRAG TO MOVE · DOUBLE-TAP TO RESIZE"
+        }
+        return Text(text)
+            .font(.system(size: 16, weight: .semibold, design: .monospaced)).monospacedDigit()
+            .foregroundStyle(edited(tab) ? cw.dialColor : ink)
+            .lineLimit(1).minimumScaleFactor(0.7)
+            .frame(maxWidth: .infinity)
+    }
+
+    /// Tool names in a sliding row, like a lens ring: whichever name is in the middle is the tool you're using.
+    /// Swipe the row (it snaps to the nearest name) or tap a name. A dot marks tools you've changed.
+    private var toolNames: some View {
+        GeometryReader { g in
+            let w = g.size.width
+            HStack(spacing: Self.nameGap) {
+                ForEach(LabTab.allCases) { t in
+                    VStack(spacing: 3) {
+                        Text(t.rawValue)
+                            .font(.system(size: 21, weight: .black, design: .rounded))
+                            .foregroundStyle(ink.opacity(t == focusedName ? 1 : 0.28))
+                        Circle().fill(cw.dialColor).frame(width: 5, height: 5).opacity(edited(t) ? 1 : 0)
+                    }
+                    .fixedSize()
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { nameWidths[t] = $0 }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation(.smooth(duration: 0.3)) { tab = t }
+                        Feedback.tick()
+                    }
+                }
+            }
+            .fixedSize()
+            .offset(x: w / 2 - nameCenter(tab) + nameDrag)
+            .frame(width: w, alignment: .leading)
+        }
+        .frame(height: 38)
+        .contentShape(Rectangle())
+        .gesture(DragGesture(minimumDistance: 6).onChanged { v in
+            let before = focusedName
+            nameDrag = v.translation.width
+            if focusedName != before { Feedback.zoomTick() }
+        }.onEnded { v in
+            let target = nameCenter(tab) - v.predictedEndTranslation.width
+            let best = LabTab.allCases.min { abs(nameCenter($0) - target) < abs(nameCenter($1) - target) } ?? tab
+            withAnimation(.smooth(duration: 0.32)) { tab = best; nameDrag = 0 }
+            Feedback.tick()
+        })
+        .padding(.horizontal, -22)   // run edge to edge under the screen's side margins
+        .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.2), .init(color: .black, location: 0.8), .init(color: .clear, location: 1)], startPoint: .leading, endPoint: .trailing))
+    }
+
+    private static let nameGap: CGFloat = 24
+    /// Centre of a tool's name along the row.
+    private func nameCenter(_ t: LabTab) -> CGFloat {
+        var x: CGFloat = 0
+        for c in LabTab.allCases {
+            let wd = nameWidths[c] ?? 90
+            if c == t { return x + wd / 2 }
+            x += wd + Self.nameGap
+        }
+        return x
+    }
+    /// The name under the middle right now (follows the finger while the row is being dragged).
+    private var focusedName: LabTab {
+        let target = nameCenter(tab) - nameDrag
+        return LabTab.allCases.min { abs(nameCenter($0) - target) < abs(nameCenter($1) - target) } ?? tab
+    }
+
     @ViewBuilder private var controls: some View {
         switch tab {
-        case .adjust:
-            VStack(spacing: 16) {
-                LabSlider(title: "Exposure", value: $exposure, range: -2...2, cw: cw) { String(format: "%+.1f", $0) }
-                LabSlider(title: "Grain", value: $grain, range: 0...100, cw: cw) { String(format: "%.0f", $0) }
-                LabSlider(title: "Warmth", value: $temp, range: 3000...10000, cw: cw) { String(format: "%.0fK", $0) }
-                LabSlider(title: "Tint", value: $tint, range: -100...100, cw: cw) { String(format: "%+.0f", $0) }
-                LabSlider(title: "Highlights", value: $highlights, range: 0...1, cw: cw) { String(format: "%.0f", $0 * 100) }
-                LabSlider(title: "Shadows", value: $shadows, range: -1...1, cw: cw) { String(format: "%+.0f", $0 * 100) }
+        case .exposure:
+            RulerDial(value: $exposure, range: -2...2, step: 0.1, defaultValue: 0, colors: [Color(white: 0.08), Color(white: 0.97)], cw: cw)
+        case .highlights:
+            RulerDial(value: $highlights, range: -1...1, step: 0.05, defaultValue: 0, colors: [Color(white: 0.35), Color(white: 1)], cw: cw)
+        case .shadows:
+            RulerDial(value: $shadows, range: -1...1, step: 0.05, defaultValue: 0, colors: [Color(white: 0.05), Color(white: 0.5)], cw: cw)
+        case .warmth:
+            RulerDial(value: $temp, range: 3000...10000, step: 100, defaultValue: 6500,
+                      colors: [Color(red: 0.25, green: 0.5, blue: 1), Color(white: 0.92), Color(red: 1, green: 0.62, blue: 0.15)], cw: cw)
+        case .tint:
+            RulerDial(value: $tint, range: -100...100, step: 5, defaultValue: 0,
+                      colors: [Color(red: 0.2, green: 0.75, blue: 0.35), Color(white: 0.92), Color(red: 0.9, green: 0.3, blue: 0.8)], cw: cw)
+        case .grain:
+            RulerDial(value: $grain, range: 0...100, step: 2, defaultValue: 0, colors: nil, cw: cw)
+        case .style:
+            if styleTuning {
+                // Strength of the chosen Style; the chevron goes back to the Style thumbnails.
+                HStack(spacing: 8) {
+                    Button { withAnimation(.smooth(duration: 0.25)) { styleTuning = false }; Feedback.tick() } label: {
+                        Image(systemName: "chevron.left").font(.system(size: 15, weight: .bold)).foregroundStyle(ink)
+                            .frame(width: 40, height: 40).background(cw.panelColor, in: Circle())
+                    }.buttonStyle(.plain).accessibilityLabel("Back to styles")
+                    RulerDial(value: $strength, range: 0...1, step: 0.025, defaultValue: 1, colors: nil, cw: cw)
+                }
+                .transition(.opacity)
+            } else {
+                styleThumbnails.transition(.opacity)
             }
         case .crop:
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 10) {
-                    chip("Rotate", "rotate.right", on: false) { rotation = (rotation + 1) % 4 }
-                    chip("Flip", "arrow.left.and.right.righttriangle.left.righttriangle.right", on: flipped) { flipped.toggle() }
+            VStack(spacing: 12) {
+                HStack(spacing: 14) {
+                    roundTool("rotate.right", "Rotate", on: rotation != 0) { rotation = (rotation + 1) % 4 }
+                    roundTool("arrow.left.and.right.righttriangle.left.righttriangle.right", "Flip", on: flipped) { flipped.toggle() }
                 }
-                Text("RATIO").font(.system(size: 12, weight: .medium, design: .monospaced)).tracking(0.6).foregroundStyle(ink.opacity(0.6))
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     chip("Original", nil, on: aspect == nil) { aspect = nil }
                     ForEach(AspectOption.allCases) { a in chip(a.rawValue, nil, on: aspect == a) { aspect = a } }
                 }
             }
-        case .style:
-            VStack(alignment: .leading, spacing: 16) {
+            .frame(maxWidth: .infinity)
+        case .stickers:
+            if statsStore.unlockedStickers.isEmpty {
+                Text("Earn stickers with achievements.").font(.footnote).foregroundStyle(ink.opacity(0.6)).frame(maxWidth: .infinity)
+            } else {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(model.styles.indices, id: \.self) { i in chip(model.styles[i].name, nil, on: styleIndex == i) { styleIndex = i } }
+                    HStack(spacing: 12) {
+                        ForEach(statsStore.unlockedStickers) { st in
+                            StickerView(sticker: st, size: 52).onTapGesture { placed.append(PlacedSticker(sticker: st)); Feedback.tick() }
+                        }
                     }
-                }
-                LabSlider(title: "Style strength", value: $strength, range: 0...1, cw: cw) { String(format: "%.0f", $0 * 100) }
-                Text("STICKERS").font(.system(size: 12, weight: .medium, design: .monospaced)).tracking(0.6).foregroundStyle(ink.opacity(0.6))
-                if statsStore.unlockedStickers.isEmpty {
-                    Text("Earn stickers with achievements.").font(.footnote).foregroundStyle(ink.opacity(0.6))
-                } else {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 10) {
-                            ForEach(statsStore.unlockedStickers) { st in
-                                StickerView(sticker: st, size: 46).onTapGesture { placed.append(PlacedSticker(sticker: st)); Feedback.tick() }
-                            }
-                        }.padding(.vertical, 4)
-                    }
+                    .padding(.vertical, 4)
+                    .frame(minWidth: UIScreen.main.bounds.width - 44)   // centred when there are only a few
                 }
             }
         }
     }
 
+    /// Each Style as a small copy of this photo. Tap to apply; tap the chosen one again to set its strength.
+    private var styleThumbnails: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(model.styles.indices, id: \.self) { i in
+                        let on = styleIndex == i
+                        Button {
+                            if on { withAnimation(.smooth(duration: 0.25)) { styleTuning = true } }
+                            else { styleIndex = i; withAnimation(.smooth) { proxy.scrollTo(i, anchor: .center) } }
+                            Feedback.tick()
+                        } label: {
+                            VStack(spacing: 5) {
+                                ZStack {
+                                    if let t = lab.thumbs[i] { Image(uiImage: t).resizable().scaledToFill() } else { cw.panelColor }
+                                    if on {
+                                        Color.black.opacity(0.3)
+                                        Image(systemName: "slider.horizontal.3").font(.system(size: 17, weight: .bold)).foregroundStyle(.white)
+                                    }
+                                }
+                                .frame(width: 60, height: 60)
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(on ? cw.accentColor : .clear, lineWidth: 3))
+                                Text(model.styles[i].name.uppercased())
+                                    .font(.system(size: 8.5, weight: .heavy, design: .monospaced))
+                                    .foregroundStyle(ink.opacity(on ? 1 : 0.5)).lineLimit(1).frame(width: 64)
+                            }
+                        }
+                        .buttonStyle(.plain).id(i)
+                        .accessibilityLabel(model.styles[i].name + (on ? ", selected. Tap to adjust strength." : ""))
+                    }
+                }
+                .padding(.horizontal, 2)
+            }
+            .onAppear { proxy.scrollTo(styleIndex, anchor: .center) }
+        }
+        .padding(.horizontal, -22).contentMargins(.horizontal, 22, for: .scrollContent)
+    }
+
+    private func roundTool(_ symbol: String, _ title: String, on: Bool, action: @escaping () -> Void) -> some View {
+        Button { action(); Feedback.tick() } label: {
+            HStack(spacing: 7) {
+                Image(systemName: symbol).font(.system(size: 15, weight: .bold))
+                Text(title).font(.system(size: 14, weight: .heavy, design: .rounded))
+            }
+            .foregroundStyle(on ? Color.black.opacity(0.88) : ink)
+            .padding(.horizontal, 18).frame(height: 42)
+            .background(on ? cw.accentColor : cw.panelColor, in: Capsule())
+        }.buttonStyle(.plain)
+    }
+
     private func chip(_ title: String, _ symbol: String?, on: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        Button { action(); Feedback.tick() } label: {
             HStack(spacing: 6) {
                 if let symbol { Image(systemName: symbol).font(.system(size: 13, weight: .bold)) }
                 Text(title).font(.system(size: 13, weight: .heavy, design: .rounded)).lineLimit(1).fixedSize()
             }
             .foregroundStyle(on ? Color.black.opacity(0.88) : ink)
-            .padding(.horizontal, 14).padding(.vertical, 10)
+            .padding(.horizontal, 12).padding(.vertical, 9)
             .background(on ? cw.accentColor : cw.panelColor.opacity(0.7), in: Capsule())
         }.buttonStyle(.plain)
     }
 
-    private var tabs: some View {
+    /// Reset everything on the left, Save a copy filling the rest.
+    private var bottomBar: some View {
         HStack(spacing: 12) {
-            tabButton("Adjust", "slider.horizontal.3", on: tab == .adjust) { tab = .adjust }
-            tabButton("Crop", "crop", on: tab == .crop) { tab = .crop }
-            tabButton("Style", "sparkles", on: tab == .style) { tab = .style }
-            tabButton("Reset", "arrow.counterclockwise", on: false) { reset() }
-        }
-    }
-
-    private func tabButton(_ title: String, _ symbol: String, on: Bool, action: @escaping () -> Void) -> some View {
-        Button { action(); Feedback.toggle() } label: {
-            VStack(spacing: 8) {
-                Image(systemName: symbol).font(.system(size: 20, weight: .bold))
-                Text(title).font(.system(size: 13, weight: .heavy, design: .rounded))
+            Button { reset(); Feedback.thump() } label: {
+                Image(systemName: "arrow.counterclockwise").font(.system(size: 20, weight: .bold)).foregroundStyle(ink)
+                    .frame(width: 60, height: 60)
+                    .background(cw.panelColor, in: Circle())
+                    .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
             }
-            .foregroundStyle(on ? Color.black.opacity(0.88) : ink)
-            .frame(maxWidth: .infinity).frame(height: 78)
-            .background(on ? cw.accentColor : cw.panelColor, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .shadow(color: .black.opacity(0.14), radius: 4, y: 3)
-        }.buttonStyle(.plain)
-    }
-
-    private var saveButton: some View {
-        Button { save(); Feedback.thump() } label: {
-            HStack {
-                Text(saved ? "Saved ✓" : "Save a copy").font(.system(size: 22, weight: .black, design: .rounded))
-                Spacer()
-                Image(systemName: saved ? "checkmark" : "arrow.down.to.line").font(.system(size: 22, weight: .bold))
+            .buttonStyle(.plain).accessibilityLabel("Reset edits")
+            Button { save(); Feedback.thump() } label: {
+                HStack {
+                    Text(saved ? "Saved ✓" : "Save a copy").font(.system(size: 20, weight: .black, design: .rounded))
+                    Spacer()
+                    Image(systemName: saved ? "checkmark" : "arrow.down.to.line").font(.system(size: 20, weight: .bold))
+                }
+                .foregroundStyle(Color.black.opacity(0.88))
+                .padding(.horizontal, 22).frame(height: 60)
+                .background(cw.dialColor, in: Capsule())
+                .shadow(color: .black.opacity(0.16), radius: 6, y: 4)
             }
-            .foregroundStyle(Color.black.opacity(0.88))
-            .padding(.horizontal, 24).padding(.vertical, 22)
-            .background(cw.dialColor, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .shadow(color: .black.opacity(0.16), radius: 6, y: 4)
+            .buttonStyle(.plain).disabled(source == nil).opacity(source == nil ? 0.45 : 1)
         }
-        .buttonStyle(.plain).disabled(source == nil).opacity(source == nil ? 0.45 : 1)
     }
 
     // MARK: Library + photo loading
@@ -463,30 +619,40 @@ struct PhotoLabView: View {
 
     private func setSource(_ d: Data) {
         guard let img = CIImage(data: d, options: [.applyOrientationProperty: true]) else { return }
-        source = img; saved = false; reset()
+        source = img; saved = false
+        lab.load(img, styles: model.styles)
+        reset()
     }
 
     private func reset() {
-        exposure = 0; grain = 0; temp = 6500; tint = 0; highlights = 1; shadows = 0; strength = 1; styleIndex = 0
-        rotation = 0; flipped = false; aspect = nil; placed = []; render()
+        exposure = 0; grain = 0; temp = 6500; tint = 0; highlights = 0; shadows = 0; strength = 1; styleIndex = 0
+        rotation = 0; flipped = false; aspect = nil; placed = []; styleTuning = false; render()
     }
 
     // MARK: Image pipeline
-    private func original(_ src: CIImage) -> UIImage {
-        let small = src.transformed(by: CGAffineTransform(scaleX: min(1, 1600 / src.extent.width), y: min(1, 1600 / src.extent.width)))
-        return ctx.createCGImage(small, from: small.extent).map(UIImage.init(cgImage:)) ?? UIImage()
+    private var params: LabParams {
+        LabParams(exposure: exposure, grain: grain, temp: temp, tint: tint, highlights: highlights, shadows: shadows,
+                  strength: strength, styleIndex: styleIndex, rotation: rotation, flipped: flipped, aspect: aspect)
     }
 
-    private func pipeline(_ src: CIImage) -> CIImage {
+    /// Pure function of the source and the settings, so it can run off the main thread.
+    static func pipeline(_ src: CIImage, _ p: LabParams, style: CameraStyle) -> CIImage {
         var img = src
-        img = img.applyingFilter("CIExposureAdjust", parameters: [kCIInputEVKey: exposure])
-        img = img.applyingFilter("CITemperatureAndTint", parameters: ["inputNeutral": CIVector(x: 6500, y: 0), "inputTargetNeutral": CIVector(x: CGFloat(temp), y: CGFloat(tint))])
-        img = img.applyingFilter("CIHighlightShadowAdjust", parameters: ["inputHighlightAmount": highlights, "inputShadowAmount": shadows])
-        img = Styles.apply(model.styles[min(styleIndex, model.styles.count - 1)], to: img, strength: Float(strength))
-        if grain > 0 { img = Styles.addGrain(Float(grain / 100) * 0.9, to: img) }
-        for _ in 0..<rotation { img = img.oriented(.right) }
-        if flipped { img = img.oriented(.upMirrored) }
-        if let a = aspect {
+        img = img.applyingFilter("CIExposureAdjust", parameters: [kCIInputEVKey: p.exposure])
+        img = img.applyingFilter("CITemperatureAndTint", parameters: ["inputNeutral": CIVector(x: 6500, y: 0), "inputTargetNeutral": CIVector(x: CGFloat(6500 * 6500 / p.temp), y: CGFloat(-p.tint))])
+        // Both mirrored so the picture moves the way the dial's strip shows: higher K = warmer, + tint = magenta.
+        img = img.applyingFilter("CIHighlightShadowAdjust", parameters: ["inputHighlightAmount": 1 + min(p.highlights, 0), "inputShadowAmount": p.shadows])
+        if p.highlights > 0 {   // lift the top of the tone curve
+            let h = CGFloat(p.highlights)
+            img = img.applyingFilter("CIToneCurve", parameters: [
+                "inputPoint0": CIVector(x: 0, y: 0), "inputPoint1": CIVector(x: 0.25, y: 0.25), "inputPoint2": CIVector(x: 0.5, y: 0.5 + 0.03 * h),
+                "inputPoint3": CIVector(x: 0.75, y: 0.75 + 0.14 * h), "inputPoint4": CIVector(x: 1, y: 1)])
+        }
+        img = Styles.apply(style, to: img, strength: Float(p.strength))
+        if p.grain > 0 { img = Styles.addGrain(Float(p.grain / 100) * 0.9, to: img) }
+        for _ in 0..<p.rotation { img = img.oriented(.right) }
+        if p.flipped { img = img.oriented(.upMirrored) }
+        if let a = p.aspect {
             let e = img.extent; var w = e.width, h = e.height
             let r = a.ratio
             if w / h > r { w = h * r } else { h = w / r }
@@ -513,19 +679,108 @@ struct PhotoLabView: View {
     }
 
     private func render() {
-        guard let src = source else { return }
-        let scaled = src.transformed(by: CGAffineTransform(scaleX: min(1, 1600 / src.extent.width), y: min(1, 1600 / src.extent.width)))
-        let out = pipeline(scaled)
-        if let cg = ctx.createCGImage(out, from: out.extent) { rendered = UIImage(cgImage: cg) }
+        guard source != nil else { return }
+        lab.submit(params, style: activeStyle)
     }
 
     private func save() {
         guard let src = source else { return }
-        let out = compositeStickers(pipeline(src))
-        guard let data = ctx.heifRepresentation(of: out, format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.displayP3)!, options: [:]) else { return }
-        // Saved like any other photo: into the !Camera album and the Photo Book.
-        CameraModel.saveToLibrary(heic: data, dng: nil) { ok in
-            DispatchQueue.main.async { saved = ok; if ok { StatsStore.shared.recordLabSave() } }
+        // Full resolution, off the main thread; stickers are drawn by SwiftUI so they're composited here first.
+        let p = params, style = activeStyle
+        let stickered = compositeStickers(CIImage(color: .clear).cropped(to: Self.pipeline(src, p, style: style).extent))
+        DispatchQueue.global(qos: .userInitiated).async {
+            let out = stickered.composited(over: Self.pipeline(src, p, style: style))
+            guard let data = CIContext().heifRepresentation(of: out, format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.displayP3)!, options: [:]) else { return }
+            // Saved like any other photo: into the !Camera album and the Photo Book.
+            CameraModel.saveToLibrary(heic: data, dng: nil) { ok in
+                DispatchQueue.main.async { saved = ok; if ok { StatsStore.shared.recordLabSave() } }
+            }
+        }
+    }
+}
+
+struct LabParams: Equatable {
+    var exposure = 0.0, grain = 0.0, temp = 6500.0, tint = 0.0, highlights = 0.0, shadows = 0.0, strength = 1.0
+    var styleIndex = 0, rotation = 0, flipped = false
+    var aspect: AspectOption?
+}
+
+/// Renders Photo Lab previews on its own queue from a small copy of the photo made once, keeping only the newest request,
+/// so dragging a dial never waits on the full-size photo or blocks the screen.
+final class LabRenderer: ObservableObject {
+    @Published private(set) var image: UIImage?
+    @Published private(set) var original: UIImage?
+    @Published private(set) var thumbs: [Int: UIImage] = [:]
+    private let queue = DispatchQueue(label: "photolab.render", qos: .userInteractive)
+    private let ctx = CIContext(options: [.cacheIntermediates: false])
+    private var base: CIImage?            // queue only
+    private var quickBase: CIImage?       // ~half size, used while a dial is moving
+    private var settle: DispatchWorkItem?  // main only: the sharp redraw once input stops
+    private let lock = NSLock()
+    private var pending: (LabParams, CameraStyle, Bool)?
+    private var busy = false
+    private var token = 0                 // main only; bumps on every new photo
+
+    func load(_ src: CIImage, styles: [CameraStyle]) {
+        token += 1
+        let t = token
+        queue.async {
+            let k = min(1, 1400 / max(src.extent.width, src.extent.height))
+            let small = src.transformed(by: CGAffineTransform(scaleX: k, y: k))
+            guard let cg = self.ctx.createCGImage(small, from: small.extent) else { return }
+            let base = CIImage(cgImage: cg)
+            self.base = base
+            let qk = 700 / max(base.extent.width, base.extent.height)
+            let q = base.transformed(by: CGAffineTransform(scaleX: qk, y: qk))
+            self.quickBase = self.ctx.createCGImage(q, from: q.extent).map { CIImage(cgImage: $0) }
+            DispatchQueue.main.async { if t == self.token { self.original = UIImage(cgImage: cg) } }
+            // A tiny copy of the photo in every Style, for the Style picker.
+            let tk = 180 / max(base.extent.width, base.extent.height)
+            let tinySmall = base.transformed(by: CGAffineTransform(scaleX: tk, y: tk))
+            guard let tcg = self.ctx.createCGImage(tinySmall, from: tinySmall.extent) else { return }
+            let tiny = CIImage(cgImage: tcg)
+            var out: [Int: UIImage] = [:]
+            for (i, st) in styles.enumerated() {
+                let o = Styles.apply(st, to: tiny).cropped(to: tiny.extent)
+                if let c = self.ctx.createCGImage(o, from: tiny.extent) { out[i] = UIImage(cgImage: c) }
+            }
+            DispatchQueue.main.async { if t == self.token { self.thumbs = out } }
+        }
+    }
+
+    func clear() {
+        token += 1
+        image = nil; original = nil; thumbs = [:]
+        settle?.cancel()
+        queue.async { self.base = nil; self.quickBase = nil }
+    }
+
+    /// Draws quickly from the small copy right away, then sharp from the full preview once changes pause.
+    func submit(_ p: LabParams, style: CameraStyle) {
+        enqueue(p, style, quick: true)
+        settle?.cancel()
+        let w = DispatchWorkItem { [weak self] in self?.enqueue(p, style, quick: false) }
+        settle = w
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: w)
+    }
+
+    private func enqueue(_ p: LabParams, _ style: CameraStyle, quick: Bool) {
+        lock.lock(); pending = (p, style, quick); let start = !busy; busy = true; lock.unlock()
+        let t = token
+        if start { queue.async { self.drain(t) } }
+    }
+
+    private func drain(_ t: Int) {
+        while true {
+            lock.lock()
+            guard let job = pending else { busy = false; lock.unlock(); return }
+            pending = nil
+            lock.unlock()
+            guard let src = (job.2 ? quickBase : nil) ?? base else { continue }
+            let out = PhotoLabView.pipeline(src, job.0, style: job.1)
+            guard let cg = ctx.createCGImage(out, from: out.extent) else { continue }
+            let ui = UIImage(cgImage: cg)
+            DispatchQueue.main.async { if t == self.token { self.image = ui } }
         }
     }
 }
@@ -538,24 +793,65 @@ struct PlacedSticker: Identifiable {
     var scale: CGFloat = 1
 }
 
-/// Orange-filled track, white knob, mono label and value (as in the design).
-struct LabSlider: View {
-    let title: String
+/// A tick ruler that slides under a fixed centre mark. Under the ticks runs a colour strip showing what the dial does
+/// (dark→light, blue→amber, green→magenta), so each tool reads differently at a glance. A notch you can feel on every
+/// step and a firmer one at the default (the dot). Double-tap puts it back to the default.
+struct RulerDial: View {
     @Binding var value: Double
     let range: ClosedRange<Double>
+    let step: Double
+    let defaultValue: Double
+    let colors: [Color]?
     let cw: Colorway
-    let display: (Double) -> String
+    @State private var dragBase: Double?
+    private let spacing: CGFloat = 10
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(title.uppercased()).font(.system(size: 12, weight: .medium, design: .monospaced)).tracking(0.6).foregroundStyle(cw.ink)
-                Spacer()
-                Text(display(value)).font(.system(size: 12, weight: .semibold, design: .monospaced)).foregroundStyle(cw.dialColor)
+        Canvas { ctx, size in
+            let mid = size.width / 2
+            let lo = Int((range.lowerBound / step).rounded()), hi = Int((range.upperBound / step).rounded())
+            let at = value / step
+            func x(_ k: Double) -> CGFloat { mid + CGFloat(k - at) * spacing }
+            let tickTop: CGFloat = 4, tickBottom: CGFloat = 32
+            for k in lo...hi {
+                let px = x(Double(k))
+                guard px > -2, px < size.width + 2 else { continue }
+                let edge = min(1, Double(min(px, size.width - px) / (size.width * 0.2)))
+                let major = k % 5 == 0
+                let h: CGFloat = major ? 22 : 12
+                var p = Path(); p.move(to: CGPoint(x: px, y: tickBottom - h)); p.addLine(to: CGPoint(x: px, y: tickBottom))
+                ctx.stroke(p, with: .color(cw.ink.opacity((major ? 0.7 : 0.3) * edge)), style: StrokeStyle(lineWidth: 2, lineCap: .round))
             }
-            // The system slider shares touches with the scrolling page correctly: a vertical drag scrolls, a horizontal one adjusts.
-            Slider(value: $value, in: range).tint(cw.dialColor)
+            // The strip covers the whole range and slides with the ticks.
+            let x0 = x(Double(lo)), x1 = x(Double(hi))
+            let strip = Path(roundedRect: CGRect(x: x0, y: tickBottom + 6, width: x1 - x0, height: 6), cornerRadius: 3)
+            if let colors {
+                ctx.fill(strip, with: .linearGradient(Gradient(colors: colors), startPoint: CGPoint(x: x0, y: 0), endPoint: CGPoint(x: x1, y: 0)))
+                ctx.stroke(strip, with: .color(cw.ink.opacity(0.15)), lineWidth: 0.5)
+            } else {
+                ctx.fill(strip, with: .color(cw.ink.opacity(0.12)))
+            }
+            // The default as a dot under the strip, then the fixed centre mark.
+            let dx = x(defaultValue / step)
+            if dx > 0, dx < size.width {
+                ctx.fill(Path(ellipseIn: CGRect(x: dx - 2.5, y: tickBottom + 16, width: 5, height: 5)), with: .color(cw.ink.opacity(0.55)))
+            }
+            var c = Path(); c.move(to: CGPoint(x: mid, y: tickTop - 3)); c.addLine(to: CGPoint(x: mid, y: tickBottom + 14))
+            ctx.stroke(c, with: .color(cw.dialColor), style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
         }
+        .frame(height: 56)
+        .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.1), .init(color: .black, location: 0.9), .init(color: .clear, location: 1)], startPoint: .leading, endPoint: .trailing))
+        .contentShape(Rectangle())
+        .gesture(DragGesture(minimumDistance: 1).onChanged { v in
+            if dragBase == nil { dragBase = value }
+            let raw = (dragBase ?? value) - Double(v.translation.width / spacing) * step
+            let snapped = min(max((raw / step).rounded() * step, range.lowerBound), range.upperBound)
+            guard abs(snapped - value) > step / 2 else { return }
+            let crossedDefault = (value - defaultValue) * (snapped - defaultValue) <= 0
+            value = snapped
+            if crossedDefault { Feedback.detent() } else { Feedback.zoomTick() }
+        }.onEnded { _ in dragBase = nil })
+        .onTapGesture(count: 2) { withAnimation(.smooth) { value = defaultValue }; Feedback.thump() }
     }
 }
 

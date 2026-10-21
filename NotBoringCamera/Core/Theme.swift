@@ -45,6 +45,12 @@ enum Feedback {
         UISelectionFeedbackGenerator().selectionChanged()
         click()
     }
+    /// A light notch for each step on the zoom wheel (no click sound: it fires a lot while dragging).
+    private static let zoomGenerator = UISelectionFeedbackGenerator()
+    static func zoomTick() {
+        guard AppSettings.shared.haptics else { return }
+        zoomGenerator.selectionChanged()
+    }
     static func thump() {
         guard AppSettings.shared.haptics else { return }
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()

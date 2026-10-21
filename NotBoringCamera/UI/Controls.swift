@@ -457,3 +457,141 @@ struct DrumWheel: View {
         .accessibilityAdjustableAction { d in index = min(max(index + (d == .increment ? 1 : -1), 0), count - 1) }
     }
 }
+
+// MARK: - Zoom wheel
+/// A dial that turns under a fixed pointer as zoom changes: ticks every tenth of a stop, the lens stops labelled, the exact
+/// zoom (and 35mm-equivalent focal length) at the top. Drag it sideways to zoom, like turning a lens ring.
+struct ZoomWheel: View {
+    let zoom: CGFloat
+    let minZoom: CGFloat
+    let maxZoom: CGFloat
+    let stops: [CGFloat]
+    let accent: Color
+    let mm: Int?
+
+    static let radius: CGFloat = 250
+    static let top: CGFloat = 12
+    static let degreesPerDoubling = 28.0
+    /// Finger travel along the rim that doubles (or halves) the zoom.
+    static var pointsPerDoubling: CGFloat { radius * CGFloat(degreesPerDoubling * .pi / 180) }
+    private var radius: CGFloat { Self.radius }
+    private var degreesPerDoubling: Double { Self.degreesPerDoubling }
+    private let visible = 70.0   // degrees either side of the pointer
+
+    var body: some View {
+        Canvas { ctx, size in
+            let top = Self.top
+            let c = CGPoint(x: size.width / 2, y: top + radius)
+            ctx.fill(Path(ellipseIn: CGRect(x: c.x - radius, y: c.y - radius, width: radius * 2, height: radius * 2)),
+                     with: .color(.black.opacity(0.42)))
+            func angle(_ v: CGFloat) -> Double { (log2(Double(v)) - log2(Double(zoom))) * degreesPerDoubling }
+            func point(_ deg: Double, _ r: CGFloat) -> CGPoint {
+                let a = (deg - 90) * .pi / 180
+                return CGPoint(x: c.x + r * CGFloat(cos(a)), y: c.y + r * CGFloat(sin(a)))
+            }
+            func fade(_ deg: Double) -> Double { max(0, 1 - pow(abs(deg) / visible, 2)) }
+
+            // Ticks: a tenth of a stop apart, longer every half stop.
+            let n0 = Int((log2(Double(minZoom)) * 10).rounded(.up)), n1 = Int((log2(Double(maxZoom)) * 10).rounded(.down))
+            if n0 <= n1 {
+                for n in n0...n1 {
+                    let deg = angle(CGFloat(pow(2, Double(n) / 10)))
+                    guard abs(deg) < visible else { continue }
+                    let len: CGFloat = n % 5 == 0 ? 9 : 5
+                    var p = Path(); p.move(to: point(deg, radius - 3)); p.addLine(to: point(deg, radius - 3 - len))
+                    ctx.stroke(p, with: .color(.white.opacity(0.55 * fade(deg))), lineWidth: 1.2)
+                }
+            }
+            // Lens stops: long ticks with labels that follow the curve.
+            for s in stops {
+                let deg = angle(s)
+                guard abs(deg) < visible else { continue }
+                var p = Path(); p.move(to: point(deg, radius - 3)); p.addLine(to: point(deg, radius - 17))
+                ctx.stroke(p, with: .color(.white.opacity(fade(deg))), lineWidth: 2)
+                guard abs(deg) > 7 else { continue }   // the readout covers the middle
+                let label = s < 1 ? String(format: "%.1f", s) : String(Int(s))
+                ctx.drawLayer { l in
+                    let q = point(deg, radius - 29)
+                    l.translateBy(x: q.x, y: q.y)
+                    l.rotate(by: .degrees(deg))
+                    l.opacity = fade(deg)
+                    l.draw(Text(label).font(.system(size: 13, weight: .heavy, design: .rounded)).foregroundStyle(.white), at: .zero)
+                }
+            }
+            // Fixed pointer and the exact value under it.
+            var tri = Path()
+            tri.move(to: CGPoint(x: c.x - 6, y: top - 2)); tri.addLine(to: CGPoint(x: c.x + 6, y: top - 2)); tri.addLine(to: CGPoint(x: c.x, y: top + 9)); tri.closeSubpath()
+            ctx.fill(tri, with: .color(accent))
+            let z = String(format: zoom < 10 ? "%.1f×" : "%.0f×", zoom)
+            ctx.draw(Text(z).font(.system(size: 17, weight: .heavy, design: .rounded)).monospacedDigit().foregroundStyle(accent),
+                     at: CGPoint(x: c.x, y: top + 29))
+            if let mm {
+                ctx.draw(Text("\(mm)MM").font(.system(size: 10, weight: .heavy, design: .rounded)).foregroundStyle(accent.opacity(0.85)),
+                         at: CGPoint(x: c.x, y: top + 46))
+            }
+        }
+        .contentShape(WheelDisk())
+        .accessibilityHidden(true)
+    }
+
+    /// Only the wheel's disk catches touches, not the empty corners of its frame.
+    struct WheelDisk: Shape {
+        func path(in r: CGRect) -> Path {
+            Path(ellipseIn: CGRect(x: r.midX - ZoomWheel.radius, y: ZoomWheel.top, width: ZoomWheel.radius * 2, height: ZoomWheel.radius * 2))
+        }
+    }
+}
+
+// MARK: - Light meter
+/// A needle on a −2…+2 stop scale. Centered and accent-coloured when the exposure is right; pinned to an end with an
+/// arrow when it's further off than the scale shows.
+struct LightMeterNeedle: View {
+    let offset: Float
+    let accent: Color
+    let ink: Color
+
+    var body: some View {
+        Canvas { ctx, size in
+            let w = size.width, h = size.height, mid = w / 2
+            let span = (w - 10) / 2   // ±2 stops
+            for i in -6...6 {
+                let x = mid + CGFloat(i) / 3 * span / 2
+                let len: CGFloat = i % 3 == 0 ? 6 : 3
+                var p = Path(); p.move(to: CGPoint(x: x, y: h - 1)); p.addLine(to: CGPoint(x: x, y: h - 1 - len))
+                ctx.stroke(p, with: .color(ink.opacity(i == 0 ? 0.9 : 0.45)), lineWidth: i == 0 ? 1.5 : 1)
+            }
+            let v = CGFloat(max(min(offset, 2), -2))
+            let x = mid + v * span / 2
+            let good = abs(offset) < 0.34
+            var needle = Path(); needle.move(to: CGPoint(x: x, y: 0)); needle.addLine(to: CGPoint(x: x, y: h))
+            ctx.stroke(needle, with: .color(good ? accent : ink), lineWidth: 2.5)
+            if abs(offset) > 2 {
+                let sym = offset > 0 ? "▶" : "◀"
+                ctx.draw(Text(sym).font(.system(size: 8, weight: .black)).foregroundStyle(ink), at: CGPoint(x: offset > 0 ? w - 3 : 3, y: 4))
+            }
+        }
+        .animation(.easeOut(duration: 0.15), value: offset)
+    }
+}
+
+// MARK: - Long exposure progress
+/// "Hold still" with a ring that fills while frames are gathered.
+struct LongExposureProgress: View {
+    let progress: Double
+    let accent: Color
+
+    var body: some View {
+        VStack(spacing: 10) {
+            ZStack {
+                Circle().stroke(.white.opacity(0.25), lineWidth: 5)
+                Circle().trim(from: 0, to: progress).stroke(accent, style: StrokeStyle(lineWidth: 5, lineCap: .round)).rotationEffect(.degrees(-90))
+                Text(String(format: "%.1f", max(0, CameraModel.longSeconds * (1 - progress))))
+                    .font(.system(size: 18, weight: .heavy, design: .rounded)).monospacedDigit().foregroundStyle(.white)
+            }
+            .frame(width: 70, height: 70)
+            Text("HOLD STILL").font(.system(size: 12, weight: .heavy, design: .rounded)).tracking(1).foregroundStyle(.white)
+        }
+        .padding(16).background(.black.opacity(0.4), in: RoundedRectangle(cornerRadius: 20))
+        .allowsHitTesting(false)
+    }
+}
